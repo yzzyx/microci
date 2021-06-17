@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
-	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 )
@@ -55,15 +54,17 @@ func exportVar(prefix string, i interface{}) []string {
 
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
-func ExecScript(ctx context.Context, script string, i interface{}) error {
-	cmd := exec.CommandContext(ctx, script)
-	cmd.Env = exportVar("", i)
+func (j *Job) ExecScript() error {
+	var err error
+	cmd := exec.CommandContext(j.ctx, j.Script)
+	cmd.Env = exportVar("", j.Event)
 
-	stderr, err := cmd.StderrPipe()
+	cmd.Stderr, err = os.Create(filepath.Join(j.Folder, "stderr"))
 	if err != nil {
 		return err
 	}
-	stdout, err := cmd.StdoutPipe()
+
+	cmd.Stdout, err = os.Create(filepath.Join(j.Folder, "stdout"))
 	if err != nil {
 		return err
 	}
@@ -72,32 +73,32 @@ func ExecScript(ctx context.Context, script string, i interface{}) error {
 		return err
 	}
 
-	wg := sync.WaitGroup{}
-
-	wg.Add(2)
-	stderrLines := bufio.NewScanner(stderr)
-	go func() {
-		lineNo := 1
-		for stderrLines.Scan() {
-			fmt.Println("[stderr]", lineNo, stderrLines.Text())
-			lineNo++
-		}
-		wg.Done()
-	}()
-
-	stdoutLines := bufio.NewScanner(stdout)
-	go func() {
-		lineNo := 1
-		for stdoutLines.Scan() {
-			fmt.Println("[stdout]", lineNo, stdoutLines.Text())
-			lineNo++
-		}
-		wg.Done()
-	}()
-
-	// According to the docs, we should not call cmd.Wait until
-	// we've finished reading from stderr/stdout
-	wg.Wait()
+	// FIXME - we should probably pipe stdout/stderr information to clients AND to files
+	//wg := sync.WaitGroup{}
+	//wg.Add(2)
+	//stderrLines := bufio.NewScanner(stderr)
+	//go func() {
+	//	lineNo := 1
+	//	for stderrLines.Scan() {
+	//		fmt.Println("[stderr]", lineNo, stderrLines.Text())
+	//		lineNo++
+	//	}
+	//	wg.Done()
+	//}()
+	//
+	//stdoutLines := bufio.NewScanner(stdout)
+	//go func() {
+	//	lineNo := 1
+	//	for stdoutLines.Scan() {
+	//		fmt.Println("[stdout]", lineNo, stdoutLines.Text())
+	//		lineNo++
+	//	}
+	//	wg.Done()
+	//}()
+	//
+	//// According to the docs, we should not call cmd.Wait until
+	//// we've finished reading from stderr/stdout
+	//wg.Wait()
 	if err := cmd.Wait(); err != nil {
 		return err
 	}

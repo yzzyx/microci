@@ -50,43 +50,47 @@ func main() {
 		}
 	}()
 
-	secretKey := os.Getenv("MICROCI_GITEA_SECRETKEY")
-	username := os.Getenv("MICROCI_GITEA_USERNAME")
-	password := os.Getenv("MICROCI_GITEA_PASSWORD")
-	token := os.Getenv("MICROCI_GITEA_TOKEN")
-	url := os.Getenv("MICROCI_GITEA_URL")
-	port := os.Getenv("MICROCI_PORT")
-	address := os.Getenv("MICROCI_ADDRESS")
+	config := Config{
+		SecretKey: os.Getenv("MICROCI_GITEA_SECRETKEY"),
+		Username:  os.Getenv("MICROCI_GITEA_USERNAME"),
+		Password:  os.Getenv("MICROCI_GITEA_PASSWORD"),
+		Token:     os.Getenv("MICROCI_GITEA_TOKEN"),
+		URL:       os.Getenv("MICROCI_GITEA_URL"),
+		Port:      os.Getenv("MICROCI_PORT"),
+		Address:   os.Getenv("MICROCI_ADDRESS"),
+	}
 
-	if secretKey == "" ||
-		(username == "" && token == "") ||
-		url == "" {
+	if config.SecretKey == "" ||
+		(config.Username == "" && config.Token == "") ||
+		config.URL == "" {
 		usage()
 		os.Exit(1)
 	}
 
-	if port == "" {
-		port = "80"
+	if config.Port == "" {
+		config.Port = "80"
 	}
 
-	// The secret key is the same as is set up in the gitea webhook configuration
-	api := &gitea.API{
-		URL:      url,
-		Token:    token,
-		Username: username,
-		Password: password,
+	worker := Worker{
+		cfg: &config,
+		api: &gitea.API{
+			URL:      config.URL,
+			Token:    config.Token,
+			Username: config.Username,
+			Password: config.Password,
+		},
 	}
 
 	// onSuccess will be called if a request to /webhook has been successfully validated
 	// Expect requests to be made to "/webhook"
-	http.HandleFunc("/webhook", gitea.Handler(secretKey, onSuccess(api)))
+	http.HandleFunc("/webhook", gitea.Handler(config.SecretKey, worker.onSuccess))
 
 	server := http.Server{
-		Addr: fmt.Sprintf("%s:%s", address, port),
+		Addr: fmt.Sprintf("%s:%s", config.Address, config.Port),
 	}
 
 	go func() {
-		log.Printf("Listening to requests on: http://%s:%s/webhook", address, port)
+		log.Printf("Listening to requests on: http://%s:%s/webhook", config.Address, config.Port)
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Printf("ListenAndServe: %+v", err)
@@ -94,10 +98,7 @@ func main() {
 		cancel()
 	}()
 
-	select {
-	case <-ctx.Done():
-	}
-
+	<-ctx.Done()
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
