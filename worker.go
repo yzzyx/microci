@@ -74,12 +74,12 @@ func (w *Worker) SetupJob(j *Job) error {
 // CloneAndMerge clones the repository specified in job, and merges with target branch if neccessary
 func (w *Worker) CloneAndMerge(j *Job) error {
 	var auth httptransport.BasicAuth
-	if w.cfg.Username == "" {
+	if w.cfg.Gitea.Username == "" {
 		auth.Username = "use_token"
-		auth.Password = w.cfg.Token
+		auth.Password = w.cfg.Gitea.Token
 	} else {
-		auth.Username = w.cfg.Username
-		auth.Password = w.cfg.Password
+		auth.Username = w.cfg.Gitea.Username
+		auth.Password = w.cfg.Gitea.Password
 	}
 
 	gitFolder := filepath.Join(j.Folder, "git")
