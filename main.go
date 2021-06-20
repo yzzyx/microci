@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"github.com/kkyr/fig"
 	gitea "github.com/yzzyx/gitea-webhook"
 )
@@ -53,7 +55,7 @@ func main() {
 
 	config := Config{}
 	err := fig.Load(&config,
-		fig.File("settings.json"),
+		fig.File("config.yaml"),
 		fig.UseEnv("MICROCI"),
 		fig.Dirs("."))
 
@@ -82,15 +84,24 @@ func main() {
 		},
 	}
 
+	view := View{
+		cfg: &config,
+	}
+
+	router := chi.NewRouter()
+	router.Use(middleware.Logger)
+
 	// onSuccess will be called if a request to /webhook/gitea has been successfully validated
-	http.HandleFunc("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.onSuccess))
+	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.onSuccess))
+	router.Get("/job/{id}", view.GetJob)
 
 	server := http.Server{
-		Addr: fmt.Sprintf("%s:%s", config.Server.Address, config.Server.Port),
+		Handler: router,
+		Addr:    fmt.Sprintf("%s:%s", config.Server.Address, config.Server.Port),
 	}
 
 	go func() {
-		log.Printf("Listening to requests on: http://%s:%s/webhook", config.Server.Address, config.Server.Port)
+		log.Printf("Listening to requests on: http://%s:%s", config.Server.Address, config.Server.Port)
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Printf("ListenAndServe: %+v", err)

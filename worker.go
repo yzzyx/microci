@@ -62,7 +62,7 @@ func (w *Worker) SetupJob(j *Job) error {
 		j.ctx, j.ctxCancel = context.WithCancel(context.Background())
 	}
 
-	j.Folder = filepath.Join("jobs", j.ID)
+	j.Folder = filepath.Join(w.cfg.Folders.Jobs, j.ID)
 	gitFolder := filepath.Join(j.Folder, "git")
 	err = os.MkdirAll(gitFolder, 0755)
 	if err != nil {

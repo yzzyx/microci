@@ -1,0 +1,9 @@
+
+server:
+  port: 8080
+  address: 127.0.0.1
+
+gitea:
+  url: https://git.aisle.se/
+  token: 123456
+  secret_key: 123456
