@@ -81,6 +81,15 @@ func main() {
 	// Expect requests to be made to "/webhook"
 	http.HandleFunc("/webhook", gitea.Handler(secretKey, onSuccess(api)))
 
+	h, err := NewViewHandler()
+	if err != nil {
+		log.Printf("Cannot initialize viewhandler: %+v", err)
+		return
+	}
+
+	http.HandleFunc("/exec", execHandler)
+	http.HandleFunc("/view", h.viewHandler)
+
 	server := http.Server{
 		Addr: fmt.Sprintf("%s:%s", address, port),
 	}
@@ -101,7 +110,7 @@ func main() {
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := server.Shutdown(ctx)
+	err = server.Shutdown(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "Error shutting down server:", err)
 	}

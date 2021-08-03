@@ -1,0 +1,13 @@
+<h3>Job {{.JobTitle}}</h3>
+<div>
+	<div>Status:</div>
+	<div>
+{{if eq .Status 0}}<span class="pending">Pending</span>{{end}}
+{{if eq .Status 1}}<span class="success">Success</span>{{end}}
+{{if eq .Status 2}}<span class="error">Error</span>{{end}}
+{{if eq .Status 3}}<span class="executing">Executing</span>{{end}}
+	</div>
+</div>
+
+<h4>Log</h4>
+<div class="log-contents">

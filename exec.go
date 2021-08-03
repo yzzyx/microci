@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -53,54 +56,82 @@ func exportVar(prefix string, i interface{}) []string {
 	return variableList
 }
 
+type Output struct {
+	OutputFile string
+	Error      error
+	Finished   bool
+}
+
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
-func ExecScript(ctx context.Context, script string, i interface{}) error {
+func ExecScript(ctx context.Context, script string, i interface{}) (*Output, error) {
 	cmd := exec.CommandContext(ctx, script)
 	cmd.Env = exportVar("", i)
 
-	stderr, err := cmd.StderrPipe()
+	// FIXME - write to correct location
+	outputFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	out := Output{
+		OutputFile: outputFile.Name(),
+	}
+
+	cleanup := func(remove bool) {
+		outputFile.Close()
+		if remove {
+			os.Remove(out.OutputFile)
+		}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return err
+		cleanup(true)
+		return nil, err
 	}
 
 	wg := sync.WaitGroup{}
-
 	wg.Add(2)
-	stderrLines := bufio.NewScanner(stderr)
-	go func() {
-		lineNo := 1
-		for stderrLines.Scan() {
-			fmt.Println("[stderr]", lineNo, stderrLines.Text())
-			lineNo++
+
+	scan := func(input io.Reader, f *os.File, prefix string) {
+		lines := bufio.NewScanner(input)
+
+		for lines.Scan() {
+			if prefix != "" {
+				f.WriteString(prefix)
+			}
+			f.Write(lines.Bytes())
+			f.WriteString("\n")
 		}
 		wg.Done()
-	}()
-
-	stdoutLines := bufio.NewScanner(stdout)
-	go func() {
-		lineNo := 1
-		for stdoutLines.Scan() {
-			fmt.Println("[stdout]", lineNo, stdoutLines.Text())
-			lineNo++
-		}
-		wg.Done()
-	}()
-
-	// According to the docs, we should not call cmd.Wait until
-	// we've finished reading from stderr/stdout
-	wg.Wait()
-	if err := cmd.Wait(); err != nil {
-		return err
 	}
 
-	return nil
+	// We're interleaving stdout and stderr in the same file,
+	// but we want to be able to highlight stderr differently, so we add a prefix
+	// to all lines coming from stderr
+	go scan(stderr, outputFile, "[[stderr]]")
+	go scan(stdout, outputFile, "")
+
+	go func() {
+		defer cleanup(false)
+
+		// According to the docs, we should not call cmd.Wait until
+		// we've finished reading from stderr/stdout
+		wg.Wait()
+
+		out.Error = cmd.Wait()
+		out.Finished = true
+	}()
+
+	return &out, nil
 }
