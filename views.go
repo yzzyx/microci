@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-var gOutput *Output
-
 type ViewHandler struct {
 	templates *template.Template
+	output    *Output
+	cancelJob func()
 }
 
 func NewViewHandler() (*ViewHandler, error) {
@@ -30,25 +30,36 @@ func NewViewHandler() (*ViewHandler, error) {
 	return h, nil
 }
 
-func execHandler(w http.ResponseWriter, r *http.Request) {
+func (h *ViewHandler) cancelHandler(w http.ResponseWriter, r *http.Request) {
+	if h.cancelJob != nil && h.output != nil && !h.output.Status.IsFinished() {
+		h.cancelJob()
+	}
 
-	if gOutput != nil && gOutput.Finished != true {
+	http.Redirect(w, r, "/view", http.StatusFound)
+}
+
+func (h *ViewHandler) execHandler(w http.ResponseWriter, r *http.Request) {
+
+	if h.output != nil && h.output.Status.IsFinished() != true {
 		fmt.Fprintf(w, "still running...")
 		return
 	}
 
-	out, err := ExecScript(context.Background(), "/tmp/slowscript", struct{}{})
+	ctx, cancel := context.WithCancel(context.Background())
+	h.cancelJob = cancel
+
+	out, err := ExecScript(ctx, "/tmp/slowscript", struct{}{})
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
 
-	gOutput = out
+	h.output = out
 	fmt.Fprintf(w, "Started program, writing to file %s\n", out.OutputFile)
 }
 
 func (h *ViewHandler) viewHandler(w http.ResponseWriter, r *http.Request) {
-	if gOutput == nil {
+	if h.output == nil {
 		fmt.Fprintf(w, "no process")
 		return
 	}
@@ -56,18 +67,11 @@ func (h *ViewHandler) viewHandler(w http.ResponseWriter, r *http.Request) {
 	vars := struct {
 		Title    string
 		JobTitle string
-		Status   int
+		Status   JobStatus
 	}{}
 
-	vars.JobTitle = gOutput.OutputFile
-
-	if !gOutput.Finished {
-		vars.Status = 3
-	} else if gOutput.Error != nil {
-		vars.Status = 2
-	} else {
-		vars.Status = 1
-	}
+	vars.JobTitle = h.output.OutputFile
+	vars.Status = h.output.Status
 
 	err := h.templates.ExecuteTemplate(w, "header.html", vars)
 	if err != nil {
@@ -99,7 +103,7 @@ func (h *ViewHandler) viewHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	f, err := os.Open(gOutput.OutputFile)
+	f, err := os.Open(h.output.OutputFile)
 	if err != nil {
 		fmt.Fprintf(w, "Cannot open: %s\n", err)
 		return
@@ -133,7 +137,7 @@ func (h *ViewHandler) viewHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scanLine()
-	for !gOutput.Finished {
+	for !h.output.Status.IsFinished() {
 		flush()
 		select {
 		case <-r.Context().Done():

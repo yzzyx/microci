@@ -11,9 +11,28 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
+
+type JobStatus int
+
+var (
+	StatusPending   JobStatus = 0
+	StatusExecuting JobStatus = 1
+	StatusSuccess   JobStatus = 2
+	StatusError     JobStatus = 3
+	StatusCancelled JobStatus = 4
+	StatusTimeout   JobStatus = 5
+)
+
+func (s JobStatus) IsFinished() bool {
+	if s != StatusPending && s != StatusExecuting {
+		return true
+	}
+	return false
+}
 
 // exportVar converts a struct to a list of variables to be exported to the shell
 func exportVar(prefix string, i interface{}) []string {
@@ -59,13 +78,15 @@ func exportVar(prefix string, i interface{}) []string {
 type Output struct {
 	OutputFile string
 	Error      error
-	Finished   bool
+	Status     JobStatus
 }
 
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
 func ExecScript(ctx context.Context, script string, i interface{}) (*Output, error) {
-	cmd := exec.CommandContext(ctx, script)
+	duration := time.Second * 5
+	timeoutCtx, _ := context.WithTimeout(ctx, duration)
+	cmd := exec.CommandContext(timeoutCtx, script)
 	cmd.Env = exportVar("", i)
 
 	// FIXME - write to correct location
@@ -86,6 +107,7 @@ func ExecScript(ctx context.Context, script string, i interface{}) (*Output, err
 
 	out := Output{
 		OutputFile: outputFile.Name(),
+		Status:     StatusExecuting,
 	}
 
 	cleanup := func(remove bool) {
@@ -130,7 +152,24 @@ func ExecScript(ctx context.Context, script string, i interface{}) (*Output, err
 		wg.Wait()
 
 		out.Error = cmd.Wait()
-		out.Finished = true
+		if out.Error != nil {
+			out.Status = StatusError
+			select {
+			case <-ctx.Done():
+				fmt.Fprintf(outputFile, "[[stderr]][microci] Cancelled by user\n")
+				out.Error = nil
+				out.Status = StatusCancelled
+			case <-timeoutCtx.Done():
+				fmt.Fprintf(outputFile, "[[stderr]][microci] Execution timed out after %s\n", duration)
+				out.Error = nil
+				out.Status = StatusTimeout
+			default:
+			}
+
+			return
+		}
+
+		out.Status = StatusSuccess
 	}()
 
 	return &out, nil

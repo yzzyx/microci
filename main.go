@@ -89,6 +89,7 @@ func main() {
 
 	http.HandleFunc("/exec", execHandler)
 	http.HandleFunc("/view", h.viewHandler)
+	http.HandleFunc("/cancel", h.cancelHandler)
 
 	server := http.Server{
 		Addr: fmt.Sprintf("%s:%s", address, port),
