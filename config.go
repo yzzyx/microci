@@ -1,10 +1,17 @@
 package main
 
+import "time"
+
 // Config includes all configuration variables
 type Config struct {
 	Server struct {
 		Port    string `fig:"port" default:"80"`
 		Address string `fig:"address" default:"0.0.0.0"`
+	}
+
+	Jobs struct {
+		Folder           string        `fig:"folder" default:"jobs"`
+		MaxExecutionTime time.Duration `fig:"max_execution_time" default:"10m"`
 	}
 
 	// Gitea specific settings
