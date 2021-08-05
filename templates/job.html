@@ -1,16 +1,18 @@
 {{template "header.html" . }}
-<h3>Job {{.JobTitle}}</h3>
+<h3>Job {{.Job.ID}}</h3>
 <div>
 	<div>Status:</div>
 	<div>
-        {{if eq .Status 0}}<span class="pending">Pending</span>{{end}}
-        {{if eq .Status 1}}<span class="executing">Executing</span> <a href="/cancel">cancel</a>{{end}}
-        {{if eq .Status 2}}<span class="success">Success</span>{{end}}
-        {{if eq .Status 3}}<span class="error">Error</span>{{end}}
-        {{if eq .Status 4}}<span class="error">Cancelled</span>{{end}}
-        {{if eq .Status 5}}<span class="error">Timed out</span>{{end}}
+        {{if eq .Job.Status 0}}<span class="pending">Pending</span>{{end}}
+        {{if eq .Job.Status 1}}<span class="executing">Executing</span> <a href="/cancel">cancel</a>{{end}}
+        {{if eq .Job.Status 2}}<span class="success">Success</span>{{end}}
+        {{if eq .Job.Status 3}}<span class="error">Error</span>{{end}}
+        {{if eq .Job.Status 4}}<span class="error">Cancelled</span>{{end}}
+        {{if eq .Job.Status 5}}<span class="error">Timed out</span>{{end}}
 	</div>
 </div>
+
+{{if ne .Job.Error "" }}<span class="error">{{.Job.Error}}</span>{{end}}
 
 <h4>Log</h4>
 <div class="log-contents">

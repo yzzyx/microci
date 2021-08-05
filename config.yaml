@@ -3,6 +3,9 @@ server:
   port: 8080
   address: 127.0.0.1
 
+jobs:
+  max_execution_time: "10s"
+
 gitea:
   url: https://git.aisle.se/
   token: 123456

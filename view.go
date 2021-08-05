@@ -73,9 +73,8 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 
 	vars := struct {
-		Title    string
-		JobTitle string
-		Status   int
+		Title string
+		Job   *Job
 	}{}
 
 	job, err := v.worker.GetJob(id)
@@ -84,18 +83,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	vars.Title = fmt.Sprintf("job %s", id)
-	vars.JobTitle = id
-
-	if job.Result == nil {
-		return errors.New("Result is nil")
-	}
-	if !job.Result.Finished {
-		vars.Status = 3
-	} else if job.Result.Error != nil {
-		vars.Status = 2
-	} else {
-		vars.Status = 1
-	}
+	vars.Job = job
 
 	err = v.templates.ExecuteTemplate(w, "job.html", vars)
 	if err != nil {
@@ -112,6 +100,10 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 		flush = func() {
 			f.Flush()
 		}
+	}
+
+	if job.Status == StatusPending {
+		return nil
 	}
 
 	f, err := os.Open(filepath.Join(job.Folder, "logs"))
@@ -158,7 +150,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	scanLine()
 
 	// If process is still running, keep reading from output file
-	for !job.Result.Finished {
+	for !job.Status.IsFinished() {
 		flush()
 		select {
 		case <-r.Context().Done():

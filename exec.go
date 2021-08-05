@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,28 +12,14 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 	"unicode"
 	"unicode/utf8"
 )
 
-type JobStatus int
-
 var (
-	StatusPending   JobStatus = 0
-	StatusExecuting JobStatus = 1
-	StatusSuccess   JobStatus = 2
-	StatusError     JobStatus = 3
-	StatusCancelled JobStatus = 4
-	StatusTimeout   JobStatus = 5
+	errExecCancelled = errors.New("Execution cancelledby user")
+	errExecTimedOut  = errors.New("Execution timed out")
 )
-
-func (s JobStatus) IsFinished() bool {
-	if s != StatusPending && s != StatusExecuting {
-		return true
-	}
-	return false
-}
 
 // exportVar converts a struct to a list of variables to be exported to the shell
 func exportVar(prefix string, i interface{}) []string {
@@ -69,7 +56,6 @@ func exportVar(prefix string, i interface{}) []string {
 		case float32, float64:
 			str = fmt.Sprintf("%f", v)
 		}
-		fmt.Println(name, str)
 		variableList = append(variableList, name+"="+str)
 	}
 	return variableList
@@ -77,16 +63,16 @@ func exportVar(prefix string, i interface{}) []string {
 
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
-func (j *Job) ExecScript() error {
-	duration := time.Second * 5
+func (j *Job) ExecScript(cfg *Config) error {
+	duration := cfg.Jobs.MaxExecutionTime
 	timeoutCtx, _ := context.WithTimeout(j.ctx, duration)
 
 	var err error
 	cmd := exec.CommandContext(timeoutCtx, j.Script)
 	cmd.Env = exportVar("", j.Event)
 
-	// FIXME - write to correct location
-	outputFile, err := os.Create(filepath.Join(j.Folder, "logs"))
+	outputFileName := filepath.Join(j.Folder, "logs")
+	outputFile, err := os.Create(outputFileName)
 	if err != nil {
 		return err
 	}
@@ -101,15 +87,10 @@ func (j *Job) ExecScript() error {
 		return err
 	}
 
-	result := &Result{
-		OutputFile: outputFile.Name(),
-		Status:     StatusExecuting,
-	}
-
 	cleanup := func(remove bool) {
 		outputFile.Close()
 		if remove {
-			os.Remove(result.OutputFile)
+			os.Remove(outputFileName)
 		}
 	}
 
@@ -117,6 +98,8 @@ func (j *Job) ExecScript() error {
 		cleanup(true)
 		return err
 	}
+
+	j.SetStatus(StatusExecuting)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -140,34 +123,23 @@ func (j *Job) ExecScript() error {
 	go scan(stderr, outputFile, "[[stderr]]")
 	go scan(stdout, outputFile, "")
 
-	go func() {
-		defer cleanup(false)
+	defer cleanup(false)
 
-		// According to the docs, we should not call cmd.Wait until
-		// we've finished reading from stderr/stdout
-		wg.Wait()
+	// According to the docs, we should not call cmd.Wait until
+	// we've finished reading from stderr/stdout
+	wg.Wait()
 
-		out.Error = cmd.Wait()
-		if out.Error != nil {
-			out.Status = StatusError
-			select {
-			case <-ctx.Done():
-				fmt.Fprintf(outputFile, "[[stderr]][microci] Cancelled by user\n")
-				out.Error = nil
-				out.Status = StatusCancelled
-			case <-timeoutCtx.Done():
-				fmt.Fprintf(outputFile, "[[stderr]][microci] Execution timed out after %s\n", duration)
-				out.Error = nil
-				out.Status = StatusTimeout
-			default:
-			}
-
-			return
+	err = cmd.Wait()
+	if err != nil {
+		select {
+		case <-j.ctx.Done():
+			return errExecCancelled
+		case <-timeoutCtx.Done():
+			return errExecTimedOut
+		default:
 		}
+		return err
+	}
 
-		out.Status = StatusSuccess
-	}()
-
-	j.Result = result
 	return nil
 }

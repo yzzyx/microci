@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+	{{ if or (eq .Job.Status 0) (eq .Job.Status 1) }}
+		<!-- refresh page after we're done loading -->
+		<meta http-equiv="refresh" content="5">
+    {{ end }}
     <title>microci{{if .Title}} - {{.Title}}{{end}}</title>
 	<style>
 		.log-contents {
