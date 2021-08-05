@@ -51,7 +51,24 @@ func ViewWrapper(fn func(w http.ResponseWriter, r *http.Request) error) http.Han
 	}
 }
 
-// Job handles all requests to "/job/{id}"
+// CancelJob aborts a specific job
+func (v *View) CancelJob(w http.ResponseWriter, r *http.Request) error {
+	id := chi.URLParam(r, "id")
+
+	job, err := v.worker.GetJob(id)
+	if err != nil {
+		return err
+	}
+
+	if job.ctxCancel != nil {
+		job.ctxCancel()
+	}
+
+	http.Redirect(w, r, "/job/"+id, http.StatusFound)
+	return nil
+}
+
+// GetJob handles all requests to "/job/{id}"
 func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 

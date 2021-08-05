@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,9 +11,28 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
+
+type JobStatus int
+
+var (
+	StatusPending   JobStatus = 0
+	StatusExecuting JobStatus = 1
+	StatusSuccess   JobStatus = 2
+	StatusError     JobStatus = 3
+	StatusCancelled JobStatus = 4
+	StatusTimeout   JobStatus = 5
+)
+
+func (s JobStatus) IsFinished() bool {
+	if s != StatusPending && s != StatusExecuting {
+		return true
+	}
+	return false
+}
 
 // exportVar converts a struct to a list of variables to be exported to the shell
 func exportVar(prefix string, i interface{}) []string {
@@ -58,8 +78,11 @@ func exportVar(prefix string, i interface{}) []string {
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
 func (j *Job) ExecScript() error {
+	duration := time.Second * 5
+	timeoutCtx, _ := context.WithTimeout(j.ctx, duration)
+
 	var err error
-	cmd := exec.CommandContext(j.ctx, j.Script)
+	cmd := exec.CommandContext(timeoutCtx, j.Script)
 	cmd.Env = exportVar("", j.Event)
 
 	// FIXME - write to correct location
@@ -80,6 +103,7 @@ func (j *Job) ExecScript() error {
 
 	result := &Result{
 		OutputFile: outputFile.Name(),
+		Status:     StatusExecuting,
 	}
 
 	cleanup := func(remove bool) {
@@ -123,8 +147,25 @@ func (j *Job) ExecScript() error {
 		// we've finished reading from stderr/stdout
 		wg.Wait()
 
-		result.Error = cmd.Wait()
-		result.Finished = true
+		out.Error = cmd.Wait()
+		if out.Error != nil {
+			out.Status = StatusError
+			select {
+			case <-ctx.Done():
+				fmt.Fprintf(outputFile, "[[stderr]][microci] Cancelled by user\n")
+				out.Error = nil
+				out.Status = StatusCancelled
+			case <-timeoutCtx.Done():
+				fmt.Fprintf(outputFile, "[[stderr]][microci] Execution timed out after %s\n", duration)
+				out.Error = nil
+				out.Status = StatusTimeout
+			default:
+			}
+
+			return
+		}
+
+		out.Status = StatusSuccess
 	}()
 
 	j.Result = result
