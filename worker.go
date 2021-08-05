@@ -81,7 +81,8 @@ func randomString() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return base64.StdEncoding.EncodeToString(b), nil
+
+	return fmt.Sprintf("%x", b), nil
 }
 
 // SetStatus updates the current status of the job, and saves it
