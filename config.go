@@ -2,6 +2,10 @@ package main
 
 // Config includes all configuration variables
 type Config struct {
+	Folders struct {
+		Jobs string `fig:"jobs" default:"jobs"`
+	}
+
 	Server struct {
 		Port    string `fig:"port" default:"80"`
 		Address string `fig:"address" default:"0.0.0.0"`
