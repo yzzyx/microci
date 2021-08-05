@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/kkyr/fig"
 	gitea "github.com/yzzyx/gitea-webhook"
 )
 
@@ -50,36 +51,39 @@ func main() {
 		}
 	}()
 
-	secretKey := os.Getenv("MICROCI_GITEA_SECRETKEY")
-	username := os.Getenv("MICROCI_GITEA_USERNAME")
-	password := os.Getenv("MICROCI_GITEA_PASSWORD")
-	token := os.Getenv("MICROCI_GITEA_TOKEN")
-	url := os.Getenv("MICROCI_GITEA_URL")
-	port := os.Getenv("MICROCI_PORT")
-	address := os.Getenv("MICROCI_ADDRESS")
+	config := Config{}
+	err := fig.Load(&config,
+		fig.File("settings.json"),
+		fig.UseEnv("MICROCI"),
+		fig.Dirs("."))
 
-	if secretKey == "" ||
-		(username == "" && token == "") ||
-		url == "" {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if config.Gitea.Username == "" && config.Gitea.Token == "" {
+		fmt.Fprintf(os.Stderr, "One of 'gitea.username' or 'gitea.token' must be specified in config\n")
+		os.Exit(1)
+
+	}
+	if config.Gitea.URL == "" {
 		usage()
 		os.Exit(1)
 	}
 
-	if port == "" {
-		port = "80"
+	worker := Worker{
+		cfg: &config,
+		api: &gitea.API{
+			URL:      config.Gitea.URL,
+			Token:    config.Gitea.Token,
+			Username: config.Gitea.Username,
+			Password: config.Gitea.Password,
+		},
 	}
 
-	// The secret key is the same as is set up in the gitea webhook configuration
-	api := &gitea.API{
-		URL:      url,
-		Token:    token,
-		Username: username,
-		Password: password,
-	}
-
-	// onSuccess will be called if a request to /webhook has been successfully validated
-	// Expect requests to be made to "/webhook"
-	http.HandleFunc("/webhook", gitea.Handler(secretKey, onSuccess(api)))
+	// onSuccess will be called if a request to /webhook/gitea has been successfully validated
+	http.HandleFunc("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.onSuccess))
 
 	h, err := NewViewHandler()
 	if err != nil {
@@ -91,11 +95,11 @@ func main() {
 	http.HandleFunc("/view", h.viewHandler)
 
 	server := http.Server{
-		Addr: fmt.Sprintf("%s:%s", address, port),
+		Addr: fmt.Sprintf("%s:%s", config.Server.Address, config.Server.Port),
 	}
 
 	go func() {
-		log.Printf("Listening to requests on: http://%s:%s/webhook", address, port)
+		log.Printf("Listening to requests on: http://%s:%s/webhook", config.Server.Address, config.Server.Port)
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Printf("ListenAndServe: %+v", err)
@@ -103,10 +107,7 @@ func main() {
 		cancel()
 	}()
 
-	select {
-	case <-ctx.Done():
-	}
-
+	<-ctx.Done()
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

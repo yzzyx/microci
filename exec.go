@@ -2,12 +2,11 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -56,48 +55,43 @@ func exportVar(prefix string, i interface{}) []string {
 	return variableList
 }
 
-type Output struct {
-	OutputFile string
-	Error      error
-	Finished   bool
-}
-
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
-func ExecScript(ctx context.Context, script string, i interface{}) (*Output, error) {
-	cmd := exec.CommandContext(ctx, script)
-	cmd.Env = exportVar("", i)
+func (j *Job) ExecScript() error {
+	var err error
+	cmd := exec.CommandContext(j.ctx, j.Script)
+	cmd.Env = exportVar("", j.Event)
 
 	// FIXME - write to correct location
-	outputFile, err := ioutil.TempFile("", "")
+	outputFile, err := os.Create(filepath.Join(j.Folder, "logs"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	out := Output{
+	result := &Result{
 		OutputFile: outputFile.Name(),
 	}
 
 	cleanup := func(remove bool) {
 		outputFile.Close()
 		if remove {
-			os.Remove(out.OutputFile)
+			os.Remove(result.OutputFile)
 		}
 	}
 
 	if err := cmd.Start(); err != nil {
 		cleanup(true)
-		return nil, err
+		return err
 	}
 
 	wg := sync.WaitGroup{}
@@ -129,9 +123,10 @@ func ExecScript(ctx context.Context, script string, i interface{}) (*Output, err
 		// we've finished reading from stderr/stdout
 		wg.Wait()
 
-		out.Error = cmd.Wait()
-		out.Finished = true
+		result.Error = cmd.Wait()
+		result.Finished = true
 	}()
 
-	return &out, nil
+	j.result = result
+	return nil
 }

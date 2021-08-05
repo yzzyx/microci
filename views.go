@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var gOutput *Output
+var gOutput *Result
 
 type ViewHandler struct {
 	templates *template.Template
