@@ -127,6 +127,6 @@ func (j *Job) ExecScript() error {
 		result.Finished = true
 	}()
 
-	j.result = result
+	j.Result = result
 	return nil
 }

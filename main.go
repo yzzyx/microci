@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -75,7 +76,9 @@ func main() {
 	}
 
 	worker := Worker{
-		cfg: &config,
+		jobsMutex: &sync.RWMutex{},
+		jobs:      map[string]*Job{},
+		cfg:       &config,
 		api: &gitea.API{
 			URL:      config.Gitea.URL,
 			Token:    config.Gitea.Token,
@@ -84,8 +87,10 @@ func main() {
 		},
 	}
 
-	view := View{
-		cfg: &config,
+	view, err := NewViewHandler(&config, &worker)
+	if err != nil {
+		log.Printf("Cannot initialize viewhandler: %+v", err)
+		return
 	}
 
 	router := chi.NewRouter()
@@ -93,16 +98,7 @@ func main() {
 
 	// onSuccess will be called if a request to /webhook/gitea has been successfully validated
 	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.onSuccess))
-	router.Get("/job/{id}", view.GetJob)
-
-	h, err := NewViewHandler()
-	if err != nil {
-		log.Printf("Cannot initialize viewhandler: %+v", err)
-		return
-	}
-
-	http.HandleFunc("/exec", execHandler)
-	http.HandleFunc("/view", h.viewHandler)
+	router.Get("/job/{id}", ViewWrapper(view.GetJob))
 
 	server := http.Server{
 		Handler: router,

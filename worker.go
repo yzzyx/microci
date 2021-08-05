@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -28,23 +30,26 @@ type Result struct {
 
 // Job defines a single webhook event to be processed
 type Job struct {
-	ID         string
-	Script     string
-	Folder     string
-	CommitID   string
-	CommitRepo string
-	Event      gitea.Event
+	ID         string      `json:"-"`
+	Script     string      `json:"script"`
+	Folder     string      `json:"-"`
+	CommitID   string      `json:"commit_id"`
+	CommitRepo string      `json:"commit_repo"`
+	Event      gitea.Event `json:"event"`
 
-	ctx       context.Context
-	ctxCancel func()
+	ctx       context.Context `json:"-"`
+	ctxCancel func()          `json:"-"`
 
-	result *Result
+	Result *Result `json:"Result"`
 }
 
 // Worker receives webhook events and processes jobs
 type Worker struct {
 	api *gitea.API
 	cfg *Config
+
+	jobs      map[string]*Job
+	jobsMutex *sync.RWMutex
 }
 
 func randomString() (string, error) {
@@ -109,7 +114,7 @@ func (w *Worker) CloneAndMerge(j *Job) error {
 }
 
 // ProcessJob tries to execute the script specified in job,
-// and updates the commit status in gitea with the result
+// and updates the commit status in gitea with the Result
 func (w *Worker) ProcessJob(j *Job) {
 	status := gitea.CreateStatusOption{
 		Context:     "",
@@ -191,7 +196,55 @@ func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter h
 			return
 		}
 
+		w.jobsMutex.Lock()
+		w.jobs[job.ID] = job
+		w.jobsMutex.Unlock()
+
 		go w.ProcessJob(job)
 		break
 	}
+}
+
+// GetJob returns a Job structure, either from memory if it exists, or recreated from disk
+func (w *Worker) GetJob(id string) (*Job, error) {
+	// First, check if we have it in memory
+	job := func() *Job {
+		w.jobsMutex.RLock()
+		defer w.jobsMutex.RUnlock()
+		return w.jobs[id]
+	}()
+	if job != nil {
+		return job, nil
+	}
+
+	// Otherwise, recreate job from disk
+	jobPath := filepath.Join(w.cfg.Folders.Jobs, id)
+	st, err := os.Stat(jobPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if !st.IsDir() {
+		return nil, fmt.Errorf("expected '%s' to be a directory", jobPath)
+	}
+
+	f, err := os.Open(filepath.Join(jobPath, "info.json"))
+	if err != nil {
+		return nil, err
+	}
+
+	job = &Job{}
+	err = json.NewDecoder(f).Decode(&job)
+	if err != nil {
+		return nil, err
+	}
+
+	job.ID = id
+	job.Folder = jobPath
+
+	// Save in memory for later
+	w.jobsMutex.Lock()
+	defer w.jobsMutex.Unlock()
+	w.jobs[id] = job
+	return job, nil
 }
