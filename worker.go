@@ -221,6 +221,10 @@ func (w *Worker) ProcessJob(j *Job) {
 
 	status.Description = "success!"
 	status.State = gitea.CommitStatusSuccess
+	err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+	if err != nil {
+		log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
+	}
 	j.SetStatus(StatusSuccess)
 }
 
