@@ -1,0 +1,24 @@
+
+server:
+  # Port to listen for requests on
+  port: 8080
+
+  # The following setting allows us to bind to a specific interface/address
+  # bind_address: 127.0.0.1
+
+  # URL of service. Links etc. will be generated using this address
+  address: http://micro.ci.local:8080/
+
+jobs:
+  # If execution time exceeds this value, abort the job.
+  max_execution_time: "5m"
+
+# Settings for accessing gitea server
+gitea:
+  url: https://git.aisle.se/
+
+  # Token generated in gitea, for API access
+  token: adcb085df3450faf81a7d61a55d8fc5b18dfca4d
+
+  # Secret key, used in gitea webhook setup
+  secret_key: 123456
