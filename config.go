@@ -6,7 +6,10 @@ import "time"
 type Config struct {
 	Server struct {
 		Port    string `fig:"port" default:"80"`
-		Address string `fig:"address" default:"0.0.0.0"`
+		Address string `fig:"address" default:"http://micro.ci:8080/"`
+
+		// Address/interface to bind to (defaults to empty)
+		BindAddress string `fig:"bind_address" default:""`
 	}
 
 	Jobs struct {

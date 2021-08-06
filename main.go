@@ -103,7 +103,7 @@ func main() {
 
 	server := http.Server{
 		Handler: router,
-		Addr:    fmt.Sprintf("%s:%s", config.Server.Address, config.Server.Port),
+		Addr:    fmt.Sprintf("%s:%s", config.Server.BindAddress, config.Server.Port),
 	}
 
 	go func() {
