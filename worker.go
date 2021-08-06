@@ -18,13 +18,6 @@ import (
 	gitea "github.com/yzzyx/gitea-webhook"
 )
 
-// Result contains information about the state of a job
-type Result struct {
-	OutputFile string
-	Error      error
-	Finished   bool
-}
-
 // JobStatus contains information about the current state of a job
 type JobStatus int
 
@@ -231,7 +224,8 @@ func (w *Worker) ProcessJob(j *Job) {
 	j.SetStatus(StatusSuccess)
 }
 
-func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter http.ResponseWriter, r *http.Request) {
+// WebhookEvent is called when a webhook has successfully been authenticated
+func (w *Worker) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWriter http.ResponseWriter, r *http.Request) {
 	var scriptName string
 	var branchName string
 
@@ -241,14 +235,20 @@ func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter h
 		config: w.cfg,
 	}
 
+	// Default script is 'default.sh'.
+	// If a script is specified in the webhook URL as a parameter,
+	// we will try to use that instead.
+	scriptName = "default.sh"
+	if s := r.URL.Query().Get("script"); s != "" {
+		scriptName = s
+	}
+
 	switch typ {
 	case gitea.EventTypePush:
-		scriptName = "push.sh"
 		branchName = strings.TrimPrefix(ev.Ref, "refs/heads/")
 		job.CommitRepo = ev.Repository.FullName
 		job.CommitID = ev.After
 	case gitea.EventTypePullRequest:
-		scriptName = "pull-request.sh"
 		branchName = ev.PullRequest.Base.Ref
 		job.CommitRepo = ev.PullRequest.Base.Repo.FullName
 		job.CommitID = ev.PullRequest.Head.SHA
@@ -261,9 +261,14 @@ func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter h
 		return
 	}
 
+	// Try to find the most specific version of the script available in the following order
+	//  - Branch-specific scripts
+	//  - Repository-wide scripts
+	//  - Global scripts (in folder "global")
 	scripts := []string{
 		filepath.Join(ev.Repository.FullName, branchName, scriptName),
 		filepath.Join(ev.Repository.FullName, scriptName),
+		filepath.Join("global", scriptName),
 	}
 
 	for _, script := range scripts {
