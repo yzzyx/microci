@@ -17,12 +17,14 @@ import (
 
 var errNotFound = errors.New("not found")
 
+// View is the base structure for views
 type View struct {
 	cfg       *Config
 	templates *template.Template
 	worker    *Worker
 }
 
+// NewViewHandler returns a new View-handler based on the supplied config and worker
 func NewViewHandler(cfg *Config, worker *Worker) (*View, error) {
 	templates, err := template.ParseGlob("templates/*")
 	if err != nil {
@@ -37,6 +39,7 @@ func NewViewHandler(cfg *Config, worker *Worker) (*View, error) {
 	return h, nil
 }
 
+// ViewWrapper wraps a view and handles errors returned by views
 func ViewWrapper(fn func(w http.ResponseWriter, r *http.Request) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := fn(w, r)

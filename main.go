@@ -96,8 +96,8 @@ func main() {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 
-	// onSuccess will be called if a request to /webhook/gitea has been successfully validated
-	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.onSuccess))
+	// WebhookEvent will be called if a request to /webhook/gitea has been successfully validated
+	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.WebhookEvent))
 	router.Get("/job/{id}", ViewWrapper(view.GetJob))
 	router.Get("/job/{id}/cancel", ViewWrapper(view.CancelJob))
 
