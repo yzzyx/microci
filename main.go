@@ -107,7 +107,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Listening to requests on: http://%s:%s", config.Server.Address, config.Server.Port)
+		log.Printf("Listening to requests on %s:%s", config.Server.BindAddress, config.Server.Port)
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Printf("ListenAndServe: %+v", err)

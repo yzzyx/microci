@@ -150,6 +150,8 @@ func (w *Worker) ProcessJob(j *Job) {
 	// Cleanup when we're done
 	defer j.logFile.Close()
 
+	log.Printf("Processing job %s", j.ID)
+
 	status := gitea.CreateStatusOption{
 		Context:   "",
 		TargetURL: path.Join(w.cfg.Server.Address, "job", j.ID),
@@ -179,11 +181,11 @@ func (w *Worker) ProcessJob(j *Job) {
 			status.State = gitea.CommitStatusError
 		}
 		j.SetStatus(jobStatus, status.Description)
-		log.Print(status.Description)
+		log.Printf("Job %s failed: %s", j.ID, status.Description)
 
 		err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 		if err != nil {
-			log.Printf("UpcateCommitState(%s) retured error: %+v\n", status.State, err)
+			log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
 		}
 	}
 
@@ -191,7 +193,7 @@ func (w *Worker) ProcessJob(j *Job) {
 	status.State = gitea.CommitStatusPending
 	err := w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 	if err != nil {
-		log.Printf("UpcateCommitState(%s) retured error: %+v\n", status.State, err)
+		log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
 	}
 
 	currentDir, err := os.Getwd()
@@ -219,6 +221,7 @@ func (w *Worker) ProcessJob(j *Job) {
 		return
 	}
 
+	log.Printf("Job %s completed successfully!", j.ID)
 	status.Description = "success!"
 	status.State = gitea.CommitStatusSuccess
 	err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
