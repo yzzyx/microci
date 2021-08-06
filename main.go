@@ -99,7 +99,7 @@ func main() {
 	// onSuccess will be called if a request to /webhook/gitea has been successfully validated
 	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.onSuccess))
 	router.Get("/job/{id}", ViewWrapper(view.GetJob))
-	router.Get("/job/{id}/cancel", view.CancelJob)
+	router.Get("/job/{id}/cancel", ViewWrapper(view.CancelJob))
 
 	server := http.Server{
 		Handler: router,
