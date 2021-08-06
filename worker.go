@@ -138,34 +138,6 @@ func (w *Worker) SetupJob(j *Job) error {
 	return j.Save()
 }
 
-// CloneAndMerge clones the repository specified in job, and merges with target branch if neccessary
-func (w *Worker) CloneAndMerge(j *Job) error {
-	var auth httptransport.BasicAuth
-	if w.cfg.Gitea.Username == "" {
-		auth.Username = "use_token"
-		auth.Password = w.cfg.Gitea.Token
-	} else {
-		auth.Username = w.cfg.Gitea.Username
-		auth.Password = w.cfg.Gitea.Password
-	}
-
-	gitFolder := filepath.Join(j.Folder, "git")
-	_, err := git.PlainCloneContext(j.ctx, gitFolder, false,
-		&git.CloneOptions{
-			URL:           j.Event.Repository.HtmlURL,
-			Auth:          &auth,
-			ReferenceName: plumbing.ReferenceName(j.Event.Ref),
-			SingleBranch:  true,
-		})
-
-	if err != nil {
-		return err
-	}
-
-	// FIXME - for pull requests, merge before executing script
-	return nil
-}
-
 // ProcessJob tries to execute the script specified in job,
 // and updates the commit status in gitea with the Result
 func (w *Worker) ProcessJob(j *Job) {
@@ -220,7 +192,11 @@ func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter h
 	var scriptName string
 	var branchName string
 
-	job := &Job{}
+	job := &Job{
+		Type:   typ,
+		Event:  ev,
+		config: w.cfg,
+	}
 
 	switch typ {
 	case gitea.EventTypePush:
