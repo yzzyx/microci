@@ -10,13 +10,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	httptransport "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitea "github.com/yzzyx/gitea-webhook"
 )
 
@@ -50,15 +48,18 @@ func (s JobStatus) IsFinished() bool {
 
 // Job defines a single webhook event to be processed
 type Job struct {
-	ID         string      `json:"-"`
-	Script     string      `json:"script"`
-	Folder     string      `json:"-"`
-	CommitID   string      `json:"commit_id"`
-	CommitRepo string      `json:"commit_repo"`
-	Event      gitea.Event `json:"event"`
+	ID         string          `json:"-"`
+	Script     string          `json:"script"`
+	Folder     string          `json:"-"`
+	CommitID   string          `json:"commit_id"`
+	CommitRepo string          `json:"commit_repo"`
+	Type       gitea.EventType `json:"type"`
+	Event      gitea.Event     `json:"event"`
 
-	ctx       context.Context `json:"-"`
-	ctxCancel func()          `json:"-"`
+	ctx       context.Context
+	ctxCancel func()
+	logFile   *os.File
+	config    *Config
 
 	Status JobStatus `json:"status"`
 	Error  string    `json:"error"`
@@ -135,26 +136,29 @@ func (w *Worker) SetupJob(j *Job) error {
 		return err
 	}
 
+	// Create and open log-file now, so that we can use it for other scripts later
+	j.logFile, err = os.Create(filepath.Join(j.Folder, "logs"))
+	if err != nil {
+		return err
+	}
 	return j.Save()
 }
 
 // ProcessJob tries to execute the script specified in job,
 // and updates the commit status in gitea with the Result
 func (w *Worker) ProcessJob(j *Job) {
+	// Cleanup when we're done
+	defer j.logFile.Close()
+
 	status := gitea.CreateStatusOption{
-		Context:     "",
-		Description: "test?",
-		State:       gitea.CommitStatusPending,
-		TargetURL:   "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		Context:   "",
+		TargetURL: path.Join(w.cfg.Server.Address, "job", j.ID),
 	}
 
-	err := w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
-	if err != nil {
-		log.Printf("UpcateCommitState(%s) retured error: %+v\n", status.State, err)
-	}
-
-	err = j.ExecScript(w.cfg)
-	if err != nil {
+	handleError := func(err error) {
+		if err == nil {
+			return
+		}
 
 		exit := &exec.ExitError{}
 		// If our script retuned an error, we should inform gitea
@@ -176,16 +180,48 @@ func (w *Worker) ProcessJob(j *Job) {
 		}
 		j.SetStatus(jobStatus, status.Description)
 		log.Print(status.Description)
-	} else {
-		status.Description = "success!"
-		status.State = gitea.CommitStatusSuccess
-		j.SetStatus(StatusSuccess)
+
+		err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+		if err != nil {
+			log.Printf("UpcateCommitState(%s) retured error: %+v\n", status.State, err)
+		}
 	}
 
-	err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+	status.Description = "In progress..."
+	status.State = gitea.CommitStatusPending
+	err := w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 	if err != nil {
 		log.Printf("UpcateCommitState(%s) retured error: %+v\n", status.State, err)
 	}
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		handleError(err)
+		return
+	}
+
+	// Run preparation scripts
+	prepareScript := "prepare-pr.sh"
+	if j.Type == gitea.EventTypePush {
+		prepareScript = "prepare-push.sh"
+	}
+
+	err = j.ExecScript(filepath.Join(currentDir, "scripts", prepareScript))
+	if err != nil {
+		handleError(err)
+		return
+	}
+
+	// Run actual text-script
+	err = j.ExecScript(filepath.Join(currentDir, j.Script))
+	if err != nil {
+		handleError(err)
+		return
+	}
+
+	status.Description = "success!"
+	status.State = gitea.CommitStatusSuccess
+	j.SetStatus(StatusSuccess)
 }
 
 func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter http.ResponseWriter, r *http.Request) {

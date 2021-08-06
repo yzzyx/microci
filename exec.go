@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -63,19 +62,14 @@ func exportVar(prefix string, i interface{}) []string {
 
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
-func (j *Job) ExecScript(cfg *Config) error {
-	duration := cfg.Jobs.MaxExecutionTime
+func (j *Job) ExecScript(script string) error {
+	duration := j.config.Jobs.MaxExecutionTime
 	timeoutCtx, _ := context.WithTimeout(j.ctx, duration)
 
 	var err error
-	cmd := exec.CommandContext(timeoutCtx, j.Script)
+	cmd := exec.CommandContext(timeoutCtx, script)
 	cmd.Env = exportVar("", j.Event)
-
-	outputFileName := filepath.Join(j.Folder, "logs")
-	outputFile, err := os.Create(outputFileName)
-	if err != nil {
-		return err
-	}
+	cmd.Dir = filepath.Join(j.Folder, "git")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -87,15 +81,7 @@ func (j *Job) ExecScript(cfg *Config) error {
 		return err
 	}
 
-	cleanup := func(remove bool) {
-		outputFile.Close()
-		if remove {
-			os.Remove(outputFileName)
-		}
-	}
-
 	if err := cmd.Start(); err != nil {
-		cleanup(true)
 		return err
 	}
 
@@ -104,15 +90,15 @@ func (j *Job) ExecScript(cfg *Config) error {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
-	scan := func(input io.Reader, f *os.File, prefix string) {
+	scan := func(input io.Reader, prefix string) {
 		lines := bufio.NewScanner(input)
 
 		for lines.Scan() {
 			if prefix != "" {
-				f.WriteString(prefix)
+				j.logFile.WriteString(prefix)
 			}
-			f.Write(lines.Bytes())
-			f.WriteString("\n")
+			j.logFile.Write(lines.Bytes())
+			j.logFile.WriteString("\n")
 		}
 		wg.Done()
 	}
@@ -120,10 +106,8 @@ func (j *Job) ExecScript(cfg *Config) error {
 	// We're interleaving stdout and stderr in the same file,
 	// but we want to be able to highlight stderr differently, so we add a prefix
 	// to all lines coming from stderr
-	go scan(stderr, outputFile, "[[stderr]]")
-	go scan(stdout, outputFile, "")
-
-	defer cleanup(false)
+	go scan(stderr, "[[stderr]]")
+	go scan(stdout, "")
 
 	// According to the docs, we should not call cmd.Wait until
 	// we've finished reading from stderr/stdout
