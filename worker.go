@@ -243,7 +243,7 @@ func (w *Worker) onSuccess(typ gitea.EventType, ev gitea.Event, responseWriter h
 	case gitea.EventTypePullRequest:
 		scriptName = "pull-request.sh"
 		branchName = ev.PullRequest.Base.Ref
-		job.CommitRepo = ev.PullRequest.Head.Repo.FullName
+		job.CommitRepo = ev.PullRequest.Base.Repo.FullName
 		job.CommitID = ev.PullRequest.Head.SHA
 	default:
 		return
