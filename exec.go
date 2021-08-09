@@ -64,7 +64,8 @@ func exportVar(prefix string, i interface{}) []string {
 // as environment variables
 func (j *Job) ExecScript(script string) error {
 	duration := j.config.Jobs.MaxExecutionTime
-	timeoutCtx, _ := context.WithTimeout(j.ctx, duration)
+	timeoutCtx, timeoutCancel := context.WithTimeout(j.ctx, duration)
+	defer timeoutCancel()
 
 	var err error
 	cmd := exec.CommandContext(timeoutCtx, script)
