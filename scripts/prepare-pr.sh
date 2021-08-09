@@ -33,7 +33,7 @@ git clone -v "$PULLREQUEST_BASE_REPO_CLONEURL" .
 git config user.email 'microci@micro.ci'
 git config user.name 'microci'
 
-git checkout -b target "$PULLREQUEST_BASE_REF"
+git checkout -b target remotes/origin/"$PULLREQUEST_BASE_REF"
 git fetch "$PULLREQUEST_HEAD_REPO_CLONEURL" +"$PULLREQUEST_HEAD_REF":source
 
 git merge source
