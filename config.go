@@ -14,6 +14,7 @@ type Config struct {
 
 	Jobs struct {
 		Folder           string        `fig:"folder" default:"jobs"`
+		DefaultContext   string        `fig:"default_context"`
 		MaxExecutionTime time.Duration `fig:"max_execution_time" default:"10m"`
 	}
 

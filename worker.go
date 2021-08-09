@@ -42,6 +42,7 @@ func (s JobStatus) IsFinished() bool {
 // Job defines a single webhook event to be processed
 type Job struct {
 	ID         string          `json:"-"`
+	Context    string          `json:"context"`
 	Script     string          `json:"script"`
 	Folder     string          `json:"-"`
 	CommitID   string          `json:"commit_id"`
@@ -146,7 +147,7 @@ func (w *Worker) ProcessJob(j *Job) {
 	log.Printf("Processing job %s", j.ID)
 
 	status := gitea.CreateStatusOption{
-		Context:   "",
+		Context:   j.Context,
 		TargetURL: path.Join(w.cfg.Server.Address, "job", j.ID),
 	}
 
@@ -230,9 +231,10 @@ func (w *Worker) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrite
 	var branchName string
 
 	job := &Job{
-		Type:   typ,
-		Event:  ev,
-		config: w.cfg,
+		Type:    typ,
+		Event:   ev,
+		config:  w.cfg,
+		Context: w.cfg.Jobs.DefaultContext,
 	}
 
 	// Default script is 'default.sh'.
@@ -241,6 +243,11 @@ func (w *Worker) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrite
 	scriptName = "default.sh"
 	if s := r.URL.Query().Get("script"); s != "" {
 		scriptName = s
+	}
+
+	// Set the context to report back to gitea
+	if s := r.URL.Query().Get("context"); s != "" {
+		job.Context = s
 	}
 
 	switch typ {

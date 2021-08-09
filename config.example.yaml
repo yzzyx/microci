@@ -13,6 +13,10 @@ jobs:
   # If execution time exceeds this value, abort the job.
   max_execution_time: "5m"
 
+  # If a specific context should be used by default, it can be specifed here.
+  # The default is an empty string.
+  # default_context: "my_context"
+
 # Settings for accessing gitea server
 gitea:
   url: https://git.aisle.se/
