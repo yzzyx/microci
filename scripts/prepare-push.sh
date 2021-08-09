@@ -12,7 +12,7 @@ function cleanup {
     exitcode=$?
     if [[ $exitcode -ne 0 ]]; then
       # If any of the git operations failed, cleanup the current directory
-      rm -rf .
+      find . -mindepth 1 -delete
     fi
     exit $exitcode
 }
