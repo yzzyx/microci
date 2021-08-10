@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -69,8 +70,10 @@ func (j *Job) ExecScript(script string) error {
 
 	var err error
 	cmd := exec.CommandContext(timeoutCtx, script)
-	cmd.Env = exportVar("", j.Event)
 	cmd.Dir = filepath.Join(j.Folder, "git")
+
+	shellVariables := exportVar("", j.Event)
+	cmd.Env = append(os.Environ(), shellVariables...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
