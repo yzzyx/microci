@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	gitea "github.com/yzzyx/gitea-webhook"
 )
@@ -347,6 +346,12 @@ func (w *Worker) GetJob(id string) (*Job, error) {
 
 	job.ID = id
 	job.Folder = jobPath
+
+	// If job is still in status pending, it means that the
+	// server was killed before it finished, so we'll consider it cancelled
+	if job.Status == StatusPending {
+		job.Status = StatusCancelled
+	}
 
 	// Save in memory for later
 	w.jobsMutex.Lock()
