@@ -114,6 +114,11 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	sectionStart := `<div class="section">
+	<div class="section-header">%s</div>
+	<div class="section-contents">`
+	sectionEnd := `</div></div>`
+
 	rowFormat := `<div><div class="num">%d</div><span>%s</span></div>`
 	stderrFormat := `<div><div class="num">%d</div><span class="error">%s</span></div>`
 
@@ -126,7 +131,11 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 			return
 		}
 
-		if strings.HasPrefix(s, "[[stderr]]") {
+		if strings.HasPrefix(s, "[[microci-section]]") {
+			s = strings.TrimPrefix(s, "[[microci-section]]")
+			fmt.Fprintf(w, sectionEnd)
+			fmt.Fprintf(w, sectionStart, s)
+		} else if strings.HasPrefix(s, "[[stderr]]") {
 			s = strings.TrimPrefix(s, "[[stderr]]")
 			fmt.Fprintf(w, stderrFormat, line, s)
 		} else {
@@ -172,5 +181,8 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 
 	// Print last line, if it does not end in newline
 	printLine(currentLineContents)
+
+	// Close the current section
+	fmt.Fprintf(w, sectionEnd)
 	return nil
 }
