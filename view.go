@@ -114,6 +114,12 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	sectionStart := `<div class="section">
+	<input id="section-toggle-%[1]d" type=checkbox class="section-toggle"%[3]s>
+	<label for="section-toggle-%[1]d" class="section-label">%[2]s</label>
+	<div class="section-contents">`
+	sectionEnd := `</div></div>`
+
 	rowFormat := `<div><div class="num">%d</div><span>%s</span></div>`
 	stderrFormat := `<div><div class="num">%d</div><span class="error">%s</span></div>`
 
@@ -121,12 +127,26 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	line := 1
 	currentLineContents := "" // Keep track of unfinished lines
 
+	sectionId := 1
 	printLine := func(s string) {
 		if s == "" {
 			return
 		}
 
-		if strings.HasPrefix(s, "[[stderr]]") {
+		if strings.HasPrefix(s, "[[microci-section]]") {
+			s = strings.TrimPrefix(s, "[[microci-section]]")
+
+			// We do not check the "git-setup" section, since it's
+			// usually not of interest.
+			checked := ""
+			if sectionId > 1 {
+				fmt.Fprintf(w, sectionEnd)
+				checked = "true"
+			}
+			fmt.Fprintf(w, sectionStart, sectionId, s, checked)
+			sectionId++
+			line = 0 // reset line-counter
+		} else if strings.HasPrefix(s, "[[stderr]]") {
 			s = strings.TrimPrefix(s, "[[stderr]]")
 			fmt.Fprintf(w, stderrFormat, line, s)
 		} else {
@@ -172,5 +192,8 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 
 	// Print last line, if it does not end in newline
 	printLine(currentLineContents)
+
+	// Close the current section
+	fmt.Fprintf(w, sectionEnd)
 	return nil
 }
