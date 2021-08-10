@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	errExecCancelled = errors.New("Execution cancelledby user")
-	errExecTimedOut  = errors.New("Execution timed out")
+	errExecCancelled = errors.New("execution cancelled by user")
+	errExecTimedOut  = errors.New("execution timed out")
 )
 
 // exportVar converts a struct to a list of variables to be exported to the shell
