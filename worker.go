@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	gitea "github.com/yzzyx/gitea-webhook"
 )
@@ -174,8 +175,12 @@ func (w *Worker) ProcessJob(j *Job) {
 			status.Description = fmt.Sprintf("error executing script: %+v", err)
 			status.State = gitea.CommitStatusError
 		}
-		j.SetStatus(jobStatus, status.Description)
 		log.Printf("Job %s failed: %s", j.ID, status.Description)
+		j.SetStatus(jobStatus, status.Description)
+		err = j.Save()
+		if err != nil {
+			log.Printf("Could not save job status: %v", err)
+		}
 
 		err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 		if err != nil {
@@ -222,7 +227,12 @@ func (w *Worker) ProcessJob(j *Job) {
 	if err != nil {
 		log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
 	}
+
 	j.SetStatus(StatusSuccess)
+	err = j.Save()
+	if err != nil {
+		log.Printf("Could not save job status: %v", err)
+	}
 }
 
 // WebhookEvent is called when a webhook has successfully been authenticated
