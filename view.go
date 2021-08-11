@@ -185,7 +185,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 		prevLine := line
 		scanLine()
 
-		if line > prevLine {
+		if line != prevLine {
 			flush()
 		}
 	}
