@@ -206,6 +206,7 @@ func (w *Worker) ProcessJob(j *Job) {
 		prepareScript = "prepare-push.sh"
 	}
 
+	fmt.Fprintf(j.logFile, "[[microci-section]]Prepare git branch\n")
 	err = j.ExecScript(filepath.Join(currentDir, "scripts", prepareScript))
 	if err != nil {
 		handleError(err)
@@ -213,6 +214,7 @@ func (w *Worker) ProcessJob(j *Job) {
 	}
 
 	// Run actual text-script
+	fmt.Fprintf(j.logFile, "[[microci-section]]Run %s\n", j.Script)
 	err = j.ExecScript(filepath.Join(currentDir, j.Script))
 	if err != nil {
 		handleError(err)
