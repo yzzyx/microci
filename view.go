@@ -21,11 +21,11 @@ var errNotFound = errors.New("not found")
 type View struct {
 	cfg       *Config
 	templates *template.Template
-	worker    *Worker
+	manager   *Manager
 }
 
-// NewViewHandler returns a new View-handler based on the supplied config and worker
-func NewViewHandler(cfg *Config, worker *Worker) (*View, error) {
+// NewViewHandler returns a new View-handler based on the supplied config and manager
+func NewViewHandler(cfg *Config, manager *Manager) (*View, error) {
 	templates, err := template.ParseGlob("templates/*")
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func NewViewHandler(cfg *Config, worker *Worker) (*View, error) {
 	h := &View{
 		cfg:       cfg,
 		templates: templates,
-		worker:    worker,
+		manager:   manager,
 	}
 	return h, nil
 }
@@ -58,7 +58,7 @@ func ViewWrapper(fn func(w http.ResponseWriter, r *http.Request) error) http.Han
 func (v *View) CancelJob(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 
-	job, err := v.worker.GetJob(id)
+	job, err := v.manager.GetJob(id)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 		Job   *Job
 	}{}
 
-	job, err := v.worker.GetJob(id)
+	job, err := v.manager.GetJob(id)
 	if err != nil {
 		return err
 	}

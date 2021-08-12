@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -76,36 +74,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	u, err := url.Parse(config.Server.Address)
+	manager, err := NewManager(&config)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not parse URL in setting 'server.address': %v\n", err)
+		log.Printf("Cannot initialize manager: %+v", err)
 		os.Exit(1)
 	}
 
-	worker := Worker{
-		jobsMutex: &sync.RWMutex{},
-		jobs:      map[string]*Job{},
-		cfg:       &config,
-		url:       u,
-		api: &gitea.API{
-			URL:      config.Gitea.URL,
-			Token:    config.Gitea.Token,
-			Username: config.Gitea.Username,
-			Password: config.Gitea.Password,
-		},
-	}
-
-	view, err := NewViewHandler(&config, &worker)
+	view, err := NewViewHandler(&config, manager)
 	if err != nil {
 		log.Printf("Cannot initialize viewhandler: %+v", err)
-		return
+		os.Exit(1)
 	}
 
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 
 	// WebhookEvent will be called if a request to /webhook/gitea has been successfully validated
-	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, worker.WebhookEvent))
+	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, manager.WebhookEvent))
 	router.Get("/job/{id}", ViewWrapper(view.GetJob))
 	router.Get("/job/{id}/cancel", ViewWrapper(view.CancelJob))
 

@@ -16,6 +16,7 @@ type Config struct {
 		Folder           string        `fig:"folder" default:"jobs"`
 		DefaultContext   string        `fig:"default_context"`
 		MaxExecutionTime time.Duration `fig:"max_execution_time" default:"10m"`
+		Workers          int           `fig:"workers" default:"1"`
 	}
 
 	// Gitea specific settings

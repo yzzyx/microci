@@ -17,6 +17,9 @@ jobs:
   # The default is an empty string.
   # default_context: "my_context"
 
+  # Number of workers to spawn
+  workers: 1
+
 # Settings for accessing gitea server
 gitea:
   url: https://git.aisle.se/

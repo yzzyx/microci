@@ -1,143 +1,28 @@
 package main
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
-	"strings"
-	"sync"
 
 	gitea "github.com/yzzyx/gitea-webhook"
 )
 
-// JobStatus contains information about the current state of a job
-type JobStatus int
-
-// All currently defined job statuses
-var (
-	StatusPending   JobStatus = 0
-	StatusExecuting JobStatus = 1
-	StatusSuccess   JobStatus = 2
-	StatusError     JobStatus = 3
-	StatusCancelled JobStatus = 4
-	StatusTimeout   JobStatus = 5
-)
-
-// IsFinished returns true if status means that job is not active anymore
-func (s JobStatus) IsFinished() bool {
-	if s != StatusPending && s != StatusExecuting {
-		return true
-	}
-	return false
-}
-
-// Job defines a single webhook event to be processed
-type Job struct {
-	ID         string          `json:"-"`
-	Context    string          `json:"context"`
-	Script     string          `json:"script"`
-	Folder     string          `json:"-"`
-	CommitID   string          `json:"commit_id"`
-	CommitRepo string          `json:"commit_repo"`
-	Type       gitea.EventType `json:"type"`
-	Event      gitea.Event     `json:"event"`
-
-	ctx       context.Context
-	ctxCancel func()
-	logFile   *os.File
-	config    *Config
-
-	Status JobStatus `json:"status"`
-	Error  string    `json:"error"`
-
-	mx sync.Mutex
-}
-
 // Worker receives webhook events and processes jobs
-type Worker struct {
-	api *gitea.API
-	cfg *Config
-	url *url.URL // URL of microci server
+type Worker struct{}
 
-	jobs      map[string]*Job
-	jobsMutex *sync.RWMutex
-}
+func NewWorker(ch <-chan *Job) {
+	w := &Worker{}
 
-func randomString() (string, error) {
-	b := make([]byte, 24)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%x", b), nil
-}
-
-// SetStatus updates the current status of the job, and saves it
-func (j *Job) SetStatus(st JobStatus, err ...string) {
-	j.mx.Lock()
-	defer j.mx.Unlock()
-
-	j.Status = st
-	if len(err) > 0 {
-		j.Error = err[0]
-	}
-}
-
-// Save job information to JSON file
-func (j *Job) Save() error {
-	j.mx.Lock()
-	defer j.mx.Unlock()
-
-	f, err := os.Create(filepath.Join(j.Folder, "info.json"))
-	if err != nil {
-		return err
-	}
-
-	err = json.NewEncoder(f).Encode(j)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// SetupJob prepares the job for execution
-func (w *Worker) SetupJob(j *Job) error {
-	var err error
-
-	if j.ID == "" {
-		j.ID, err = randomString()
-		if err != nil {
-			return err
+	for job := range ch {
+		if job == nil {
+			return
 		}
+		w.ProcessJob(job)
 	}
-
-	if j.ctx == nil {
-		j.ctx, j.ctxCancel = context.WithCancel(context.Background())
-	}
-
-	j.Folder = filepath.Join(w.cfg.Jobs.Folder, j.ID)
-	gitFolder := filepath.Join(j.Folder, "git")
-	err = os.MkdirAll(gitFolder, 0755)
-	if err != nil {
-		return err
-	}
-
-	// Create and open log-file now, so that we can use it for other scripts later
-	j.logFile, err = os.Create(filepath.Join(j.Folder, "logs"))
-	if err != nil {
-		return err
-	}
-	return j.Save()
 }
 
 // ProcessJob tries to execute the script specified in job,
@@ -148,11 +33,9 @@ func (w *Worker) ProcessJob(j *Job) {
 
 	log.Printf("Processing job %s", j.ID)
 
-	u := *w.url
-	u.Path = path.Join(u.Path, "job", j.ID)
 	status := gitea.CreateStatusOption{
 		Context:   j.Context,
-		TargetURL: u.String(),
+		TargetURL: j.TargetURL,
 	}
 
 	handleError := func(err error) {
@@ -185,7 +68,7 @@ func (w *Worker) ProcessJob(j *Job) {
 			log.Printf("Could not save job status: %v", err)
 		}
 
-		err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+		err = j.API.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 		if err != nil {
 			log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
 		}
@@ -193,7 +76,7 @@ func (w *Worker) ProcessJob(j *Job) {
 
 	status.Description = "In progress..."
 	status.State = gitea.CommitStatusPending
-	err := w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+	err := j.API.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 	if err != nil {
 		log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
 	}
@@ -228,7 +111,7 @@ func (w *Worker) ProcessJob(j *Job) {
 	log.Printf("Job %s completed successfully!", j.ID)
 	status.Description = "success!"
 	status.State = gitea.CommitStatusSuccess
-	err = w.api.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+	err = j.API.UpdateCommitState(j.CommitRepo, j.CommitID, status)
 	if err != nil {
 		log.Printf("UpcateCommitState(%s) retured error: %+v", status.State, err)
 	}
@@ -238,130 +121,4 @@ func (w *Worker) ProcessJob(j *Job) {
 	if err != nil {
 		log.Printf("Could not save job status: %v", err)
 	}
-}
-
-// WebhookEvent is called when a webhook has successfully been authenticated
-func (w *Worker) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWriter http.ResponseWriter, r *http.Request) {
-	var scriptName string
-	var branchName string
-
-	job := &Job{
-		Type:    typ,
-		Event:   ev,
-		config:  w.cfg,
-		Context: w.cfg.Jobs.DefaultContext,
-	}
-
-	// Default script is 'default.sh'.
-	// If a script is specified in the webhook URL as a parameter,
-	// we will try to use that instead.
-	scriptName = "default.sh"
-	if s := r.URL.Query().Get("script"); s != "" {
-		scriptName = s
-	}
-
-	// Set the context to report back to gitea
-	if s := r.URL.Query().Get("context"); s != "" {
-		job.Context = s
-	}
-
-	switch typ {
-	case gitea.EventTypePush:
-		branchName = strings.TrimPrefix(ev.Ref, "refs/heads/")
-		job.CommitRepo = ev.Repository.FullName
-		job.CommitID = ev.After
-	case gitea.EventTypePullRequest:
-		branchName = ev.PullRequest.Base.Ref
-		job.CommitRepo = ev.PullRequest.Base.Repo.FullName
-		job.CommitID = ev.PullRequest.Head.SHA
-	default:
-		return
-	}
-
-	if !isDir(ev.Repository.FullName) {
-		log.Printf("ignoring repositoriy '%s' - is not a directory", ev.Repository.FullName)
-		return
-	}
-
-	// Try to find the most specific version of the script available in the following order
-	//  - Branch-specific scripts
-	//  - Repository-wide scripts
-	//  - Global scripts (in folder "global")
-	scripts := []string{
-		filepath.Join(ev.Repository.FullName, branchName, scriptName),
-		filepath.Join(ev.Repository.FullName, scriptName),
-		filepath.Join("global", scriptName),
-	}
-
-	for _, script := range scripts {
-		if !isFile(script) {
-			continue
-		}
-
-		job.Script = script
-		err := w.SetupJob(job)
-		if err != nil {
-			log.Printf("SetupJob: %+v", err)
-			responseWriter.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(responseWriter, "Could not process webhook: %+v", err)
-			return
-		}
-
-		w.jobsMutex.Lock()
-		w.jobs[job.ID] = job
-		w.jobsMutex.Unlock()
-
-		go w.ProcessJob(job)
-		break
-	}
-}
-
-// GetJob returns a Job structure, either from memory if it exists, or recreated from disk
-func (w *Worker) GetJob(id string) (*Job, error) {
-	// First, check if we have it in memory
-	job := func() *Job {
-		w.jobsMutex.RLock()
-		defer w.jobsMutex.RUnlock()
-		return w.jobs[id]
-	}()
-	if job != nil {
-		return job, nil
-	}
-
-	// Otherwise, recreate job from disk
-	jobPath := filepath.Join(w.cfg.Jobs.Folder, id)
-	st, err := os.Stat(jobPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if !st.IsDir() {
-		return nil, fmt.Errorf("expected '%s' to be a directory", jobPath)
-	}
-
-	f, err := os.Open(filepath.Join(jobPath, "info.json"))
-	if err != nil {
-		return nil, err
-	}
-
-	job = &Job{}
-	err = json.NewDecoder(f).Decode(&job)
-	if err != nil {
-		return nil, err
-	}
-
-	job.ID = id
-	job.Folder = jobPath
-
-	// If job is still in status pending, it means that the
-	// server was killed before it finished, so we'll consider it cancelled
-	if job.Status == StatusPending {
-		job.Status = StatusCancelled
-	}
-
-	// Save in memory for later
-	w.jobsMutex.Lock()
-	defer w.jobsMutex.Unlock()
-	w.jobs[id] = job
-	return job, nil
 }
