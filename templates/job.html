@@ -10,9 +10,11 @@
         {{if eq .Job.Status 4}}<span class="error">Cancelled</span>{{end}}
         {{if eq .Job.Status 5}}<span class="error">Timed out</span>{{end}}
 	</div>
+	<div>
+		{{.Job.StatusDescription}}
+	</div>
 </div>
 
-{{if ne .Job.Error "" }}<span class="error">{{.Job.Error}}</span>{{end}}
 
 <h4>Log</h4>
 <div class="log-contents">

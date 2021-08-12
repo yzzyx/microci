@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	gitea "github.com/yzzyx/gitea-webhook"
 )
@@ -54,8 +56,11 @@ type Job struct {
 	logFile   *os.File
 	config    *Config
 
-	Status JobStatus `json:"status"`
-	Error  string    `json:"error"`
+	Status            JobStatus `json:"status"`
+	StatusDescription string    `json:"status_description"`
+
+	statusUpdateMx     *sync.Mutex
+	statusCancelUpdate func()
 
 	mx sync.Mutex
 }
@@ -85,6 +90,10 @@ func (j *Job) Setup() error {
 		j.ctx, j.ctxCancel = context.WithCancel(context.Background())
 	}
 
+	if j.statusUpdateMx == nil {
+		j.statusUpdateMx = &sync.Mutex{}
+	}
+
 	j.TargetURL = strings.TrimSuffix(j.TargetURL, "/") + path.Join("/job", j.ID)
 	j.Folder = filepath.Join(j.config.Jobs.Folder, j.ID)
 	gitFolder := filepath.Join(j.Folder, "git")
@@ -102,14 +111,57 @@ func (j *Job) Setup() error {
 }
 
 // SetStatus updates the current status of the job, and saves it
-func (j *Job) SetStatus(st JobStatus, err ...string) {
+func (j *Job) SetStatus(st JobStatus, description ...string) {
 	j.mx.Lock()
 	defer j.mx.Unlock()
 
 	j.Status = st
-	if len(err) > 0 {
-		j.Error = err[0]
+	j.StatusDescription = strings.Join(description, " ")
+	go j.PushStatus()
+}
+
+func (j *Job) PushStatus() {
+	j.statusUpdateMx.Lock()
+	if j.statusCancelUpdate != nil {
+		j.statusCancelUpdate()
 	}
+
+	var ctx context.Context
+	ctx, j.statusCancelUpdate = context.WithCancel(context.Background())
+	j.statusUpdateMx.Unlock()
+
+	status := gitea.CreateStatusOption{
+		Context:     j.Context,
+		TargetURL:   j.TargetURL,
+		Description: j.StatusDescription,
+	}
+
+	switch j.Status {
+	case StatusPending, StatusExecuting:
+		status.State = gitea.CommitStatusPending
+	case StatusCancelled, StatusTimeout:
+		status.State = gitea.CommitStatusError
+	case StatusSuccess:
+		status.State = gitea.CommitStatusSuccess
+	case StatusError:
+		status.State = gitea.CommitStatusFailure
+	}
+
+	var err error
+	for i := 0; i < 3; i++ {
+		err = j.API.UpdateCommitState(j.CommitRepo, j.CommitID, status)
+		if err == nil {
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			// We've been cancelled
+			return
+		case <-time.After(1 * time.Second):
+		}
+	}
+	log.Printf("UpdateCommitState(%s) failed after 3 attempts. last error: %v", status.State, err)
 }
 
 // Save job information to JSON file
