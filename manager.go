@@ -20,9 +20,12 @@ type Manager struct {
 	cfg *Config
 	url *url.URL // URL of microci server
 
-	workerCh  chan *Job
-	jobs      map[string]*Job
-	jobsMutex *sync.RWMutex
+	workerCh chan *Job
+
+	repos      []*Repository
+	reposMutex *sync.Mutex
+	jobs       map[string]*Job
+	jobsMutex  *sync.RWMutex
 }
 
 func NewManager(cfg *Config) (*Manager, error) {
@@ -72,6 +75,25 @@ func (m *Manager) Shutdown() {
 	}
 }
 
+func (m *Manager) GetRepo(name string) *Repository {
+	m.reposMutex.Lock()
+	defer m.reposMutex.Unlock()
+
+	for k := range m.repos {
+		if m.repos[k].Name == name {
+			return m.repos[k]
+		}
+	}
+
+	repo := &Repository{
+		Name:   name,
+		Queues: nil,
+	}
+
+	m.repos = append(m.repos, repo)
+	return repo
+}
+
 // WebhookEvent is called when a webhook has successfully been authenticated
 func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWriter http.ResponseWriter, r *http.Request) {
 	var scriptName string
@@ -99,23 +121,29 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 		job.Context = s
 	}
 
+	var queueName string
 	switch typ {
 	case gitea.EventTypePush:
 		branchName = strings.TrimPrefix(ev.Ref, "refs/heads/")
+		queueName = branchName
 		job.CommitRepo = ev.Repository.FullName
 		job.CommitID = ev.After
 	case gitea.EventTypePullRequest:
 		branchName = ev.PullRequest.Base.Ref
+		queueName = fmt.Sprintf("PR #%d", ev.PullRequest.ID)
 		job.CommitRepo = ev.PullRequest.Base.Repo.FullName
 		job.CommitID = ev.PullRequest.Head.SHA
 	default:
 		return
 	}
 
-	if !isDir(ev.Repository.FullName) {
+	if !isDir(job.CommitRepo) {
 		log.Printf("ignoring repositoriy '%s' - is not a directory", ev.Repository.FullName)
 		return
 	}
+
+	repo := m.GetRepo(job.CommitRepo)
+	q := repo.GetQueue(queueName, job.Context)
 
 	// Try to find the most specific version of the script available in the following order
 	//  - Branch-specific scripts
