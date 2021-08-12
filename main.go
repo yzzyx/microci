@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -75,10 +76,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	u, err := url.Parse(config.Server.Address)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not parse URL in setting 'server.address': %v\n", err)
+		os.Exit(1)
+	}
+
 	worker := Worker{
 		jobsMutex: &sync.RWMutex{},
 		jobs:      map[string]*Job{},
 		cfg:       &config,
+		url:       u,
 		api: &gitea.API{
 			URL:      config.Gitea.URL,
 			Token:    config.Gitea.Token,

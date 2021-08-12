@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -65,6 +66,7 @@ type Job struct {
 type Worker struct {
 	api *gitea.API
 	cfg *Config
+	url *url.URL // URL of microci server
 
 	jobs      map[string]*Job
 	jobsMutex *sync.RWMutex
@@ -146,9 +148,11 @@ func (w *Worker) ProcessJob(j *Job) {
 
 	log.Printf("Processing job %s", j.ID)
 
+	u := *w.url
+	u.Path = path.Join(u.Path, "job", j.ID)
 	status := gitea.CreateStatusOption{
 		Context:   j.Context,
-		TargetURL: path.Join(w.cfg.Server.Address, "job", j.ID),
+		TargetURL: u.String(),
 	}
 
 	handleError := func(err error) {
