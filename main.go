@@ -112,6 +112,8 @@ func main() {
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	manager.Shutdown()
+
 	err = server.Shutdown(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "Error shutting down server:", err)

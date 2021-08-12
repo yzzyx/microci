@@ -60,6 +60,16 @@ func NewManager(cfg *Config) (*Manager, error) {
 
 func (m *Manager) Shutdown() {
 	close(m.workerCh)
+
+	m.jobsMutex.Lock()
+	defer m.jobsMutex.Unlock()
+
+	// Cancel active jobs
+	for _, j := range m.jobs {
+		if j.ctxCancel != nil {
+			j.ctxCancel()
+		}
+	}
 }
 
 // WebhookEvent is called when a webhook has successfully been authenticated
