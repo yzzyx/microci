@@ -141,7 +141,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 			checked := ""
 			if sectionId > 1 {
 				fmt.Fprintf(w, sectionEnd)
-				checked = "true"
+				checked = " checked"
 			}
 			fmt.Fprintf(w, sectionStart, sectionId, s, checked)
 			sectionId++
