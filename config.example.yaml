@@ -17,6 +17,9 @@ jobs:
   # The default is an empty string.
   # default_context: "my_context"
 
+  # Should previous jobs on the same branch/PR be cancelled when a new job is created?
+  cancel_previous: true
+
   # Number of workers to spawn
   workers: 1
 

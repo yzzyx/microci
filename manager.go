@@ -170,8 +170,8 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 		m.jobs[job.ID] = job
 		m.jobsMutex.Unlock()
 
-		// Cancel previous run of this particular job, if we have one
-		if lastJob := q.GetLastJob(); lastJob != nil && lastJob.ctxCancel != nil {
+		// Cancel previous run of this particular job, if we have one (and setting is active)
+		if lastJob := q.GetLastJob(); lastJob != nil && lastJob.ctxCancel != nil && m.cfg.Jobs.CancelPrevious {
 			lastJob.ctxCancel()
 		}
 		q.AddJob(job)
