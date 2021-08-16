@@ -120,9 +120,10 @@ func (j *Job) ExecScript(script string) error {
 	err = cmd.Wait()
 	if err != nil {
 		select {
-		case <-j.ctx.Done():
-			return errExecCancelled
 		case <-timeoutCtx.Done():
+			if errors.Is(timeoutCtx.Err(), context.Canceled) {
+				return errExecCancelled
+			}
 			return errExecTimedOut
 		default:
 		}

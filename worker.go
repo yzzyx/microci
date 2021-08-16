@@ -45,10 +45,10 @@ func (w *Worker) ProcessJob(j *Job) {
 		if errors.As(err, &exit) {
 			description = fmt.Sprintf("script failed with code %d", exit.ExitCode())
 		} else if errors.Is(err, errExecCancelled) {
-			description = "Job cancelled by user"
+			description = "job cancelled"
 			jobStatus = StatusCancelled
 		} else if errors.Is(err, errExecTimedOut) {
-			description = "Job execution timed out"
+			description = "job execution timed out"
 			jobStatus = StatusTimeout
 		}
 		log.Printf("Job %s failed: %s", j.ID, description)

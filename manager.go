@@ -35,10 +35,11 @@ func NewManager(cfg *Config) (*Manager, error) {
 	}
 
 	m := &Manager{
-		jobsMutex: &sync.RWMutex{},
-		jobs:      map[string]*Job{},
-		cfg:       cfg,
-		url:       u,
+		jobsMutex:  &sync.RWMutex{},
+		jobs:       map[string]*Job{},
+		reposMutex: &sync.Mutex{},
+		cfg:        cfg,
+		url:        u,
 		api: &gitea.API{
 			URL:      cfg.Gitea.URL,
 			Token:    cfg.Gitea.Token,
@@ -85,11 +86,7 @@ func (m *Manager) GetRepo(name string) *Repository {
 		}
 	}
 
-	repo := &Repository{
-		Name:   name,
-		Queues: nil,
-	}
-
+	repo := NewRepository(name)
 	m.repos = append(m.repos, repo)
 	return repo
 }
@@ -172,6 +169,12 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 		m.jobsMutex.Lock()
 		m.jobs[job.ID] = job
 		m.jobsMutex.Unlock()
+
+		// Cancel previous run of this particular job, if we have one
+		if lastJob := q.GetLastJob(); lastJob != nil && lastJob.ctxCancel != nil {
+			lastJob.ctxCancel()
+		}
+		q.AddJob(job)
 
 		// Add job to manager queue
 		m.workerCh <- job
