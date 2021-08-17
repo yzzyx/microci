@@ -16,7 +16,7 @@ type Config struct {
 		Folder           string        `fig:"folder" default:"jobs"`
 		DefaultContext   string        `fig:"default_context"`
 		MaxExecutionTime time.Duration `fig:"max_execution_time" default:"10m"`
-		CancelPrevious   bool          `fig:"cancel_previous" default:"true"`
+		CancelPrevious   bool          `fig:"cancel_previous"`
 		Workers          int           `fig:"workers" default:"1"`
 	}
 
