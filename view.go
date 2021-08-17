@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/yzzyx/microci/ansi"
 )
 
 var errNotFound = errors.New("not found")
@@ -148,11 +149,10 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 			line = 0 // reset line-counter
 		} else if strings.HasPrefix(s, "[[stderr]]") {
 			s = strings.TrimPrefix(s, "[[stderr]]")
-			fmt.Fprintf(w, stderrFormat, line, s)
+			fmt.Fprintf(w, stderrFormat, line, ansi.ToHTML(s))
 		} else {
-			fmt.Fprintf(w, rowFormat, line, s)
+			fmt.Fprintf(w, rowFormat, line, ansi.ToHTML(s))
 		}
-
 	}
 
 	// Parse output line by line, so that we can present it nicely

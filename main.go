@@ -93,6 +93,7 @@ func main() {
 	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, manager.WebhookEvent))
 	router.Get("/job/{id}", ViewWrapper(view.GetJob))
 	router.Get("/job/{id}/cancel", ViewWrapper(view.CancelJob))
+	router.Mount("/css", http.StripPrefix("/css", http.FileServer(http.Dir("static/css"))))
 
 	server := http.Server{
 		Handler: router,
