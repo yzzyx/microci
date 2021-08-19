@@ -26,6 +26,6 @@ export GIT_TERMINAL_PROMPT=0
 
 # Echo the commands we're executing, so that they get logged
 set -x
-git clone -v "$PULLREQUEST_BASE_REPO_CLONEURL" .
-git checkout -b target remotes/origin/"$PULLREQUEST_BASE_REF"
+git clone -v "$REPOSITORY_CLONEURL" .
+git checkout -b target remotes/origin/"${REF#refs/heads/}"
 set +x
