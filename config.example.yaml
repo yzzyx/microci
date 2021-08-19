@@ -9,7 +9,14 @@ server:
   # URL of service. Links etc. will be generated using this address
   address: http://micro.ci.local:8080/
 
+scripts:
+  # Specify folder where microci will look for scripts to execute
+  folder: "scripts"
+
 jobs:
+  # Specify folder where jobs will be saved
+  folder: "jobs"
+
   # If execution time exceeds this value, abort the job.
   max_execution_time: "5m"
 

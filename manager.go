@@ -146,11 +146,14 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 	// Try to find the most specific version of the script available in the following order
 	//  - Branch-specific scripts
 	//  - Repository-wide scripts
-	//  - Global scripts (in folder "global")
+	//  - Global scripts (in main script folder)
+	repoPath := path.Clean(ev.Repository.FullName)
+	branchPath := path.Clean(branchName)
+	scriptName = path.Clean(scriptName)
 	scripts := []string{
-		filepath.Join(ev.Repository.FullName, branchName, scriptName),
-		filepath.Join(ev.Repository.FullName, scriptName),
-		filepath.Join("global", scriptName),
+		filepath.Join(m.cfg.Scripts.Folder, repoPath, branchPath, scriptName),
+		filepath.Join(m.cfg.Scripts.Folder, repoPath, scriptName),
+		filepath.Join(m.cfg.Scripts.Folder, scriptName),
 	}
 
 	for _, script := range scripts {

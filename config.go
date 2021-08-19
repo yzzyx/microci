@@ -12,6 +12,10 @@ type Config struct {
 		BindAddress string `fig:"bind_address" default:""`
 	}
 
+	Scripts struct {
+		Folder string `fig:"folder" default:"scripts"`
+	}
+
 	Jobs struct {
 		Folder           string        `fig:"folder" default:"jobs"`
 		DefaultContext   string        `fig:"default_context"`
