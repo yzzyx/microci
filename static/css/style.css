@@ -1,0 +1,40 @@
+.log-contents {
+    font-family: monospace;
+    background-color: #f5f5ff;
+}
+
+.log-contents .num {
+    display: inline-block;
+    width: 2em;
+    padding-right: 1em;
+    text-align: right;
+    color: #555;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.section-toggle:checked + .section-label + .section-contents {
+    max-height: 100%;
+}
+
+.section-contents {
+    max-height: 0;
+    white-space: pre;
+    overflow: hidden;
+    transition: max-height .25s ease-in-out;
+}
+
+.pending {
+    color: #555;
+}
+.error {
+    color: #ff1e12;
+}
+.success {
+    color: #298416;
+}
+.executing {
+    color: #ffb728;
+}
