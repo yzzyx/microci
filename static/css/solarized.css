@@ -1,0 +1,60 @@
+/* Colorscheme based on solarized (https://ethanschoonover.com/solarized/) Copyright (c) 2011 Ethan Schoonover
+ */
+.wrap {
+    color: #002b36;
+    background-color: #fdf6e3;
+}
+
+.log-contents {
+    border: 1px solid #eee8d5;
+    background-color: #fdf6e3;
+    color: #073642;
+}
+
+.log-contents .num {
+    background-color: #eee8d5;
+    color: #839496;
+}
+
+/* Dark mode */
+#dark-toggle:checked + .wrap {
+    color: #eee8d5;
+    background-color: #002b36;
+}
+
+#dark-toggle:checked + .wrap .log-contents {
+    border: 1px solid #073642;
+    background-color: #002b36;
+    color: #839496;
+}
+
+#dark-toggle:checked + .wrap .log-contents .num {
+    background-color: #073642;
+    color: #657b83;
+}
+
+a, a:visited  {
+    color: #268bd2;
+}
+
+.pending { color: #657b83; }
+.error { color: #dc322f; }
+.success { color: #859900; }
+.executing { color: #cb4b16; }
+
+.c0 {color: #eee8d5;}
+.c1 {color: #dc322f;}
+.c2 {color: #859900;}
+.c3 {color: #b58900;}
+.c4 {color: #268bd2;}
+.c5 {color: #d33682;}
+.c6 {color: #2aa198;}
+.c7 {color: #073642;}
+.c8 {color: #fdf6e3;}
+.c9 {color: #cb4b16;}
+.c10 {color: #93a1a1;}
+.c11 {color: #839496;}
+.c12 {color: #657b83;}
+.c13 {color: #6c71c4;}
+.c14 {color: #586e75;}
+.c15 {color: #002b36;}

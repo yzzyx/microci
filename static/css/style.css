@@ -1,18 +1,41 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.wrap {
+    padding: 8px;
+}
+
+#dark-toggle {
+    position: fixed;
+    right: 15px;
+    top: 15px;
+    opacity: 30%;
+}
+
 .log-contents {
     font-family: monospace;
-    background-color: #f5f5ff;
+    padding: 5px 0;
+    border: 1px solid #073642;
+    border-radius: 3px;
 }
 
 .log-contents .num {
     display: inline-block;
     width: 2em;
-    padding-right: 1em;
+    padding-right: 0.5em;
+    margin-right: 0.5em;
     text-align: right;
-    color: #555;
     -ms-user-select: none;
     -moz-user-select: none;
     -webkit-user-select: none;
     user-select: none;
+}
+
+.section-toggle {
+    margin-left: 5px;
 }
 
 .section-toggle:checked + .section-label + .section-contents {
@@ -24,17 +47,4 @@
     white-space: pre;
     overflow: hidden;
     transition: max-height .25s ease-in-out;
-}
-
-.pending {
-    color: #555;
-}
-.error {
-    color: #ff1e12;
-}
-.success {
-    color: #298416;
-}
-.executing {
-    color: #ffb728;
 }
