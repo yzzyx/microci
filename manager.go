@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -118,16 +120,15 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 		job.Context = s
 	}
 
-	var queueName string
 	switch typ {
 	case gitea.EventTypePush:
 		branchName = strings.TrimPrefix(ev.Ref, "refs/heads/")
-		queueName = branchName
+		job.QueueName = branchName
 		job.CommitRepo = ev.Repository.FullName
 		job.CommitID = ev.After
 	case gitea.EventTypePullRequest:
 		branchName = ev.PullRequest.Base.Ref
-		queueName = fmt.Sprintf("PR #%d", ev.PullRequest.ID)
+		job.QueueName = fmt.Sprintf("PR #%d", ev.PullRequest.ID)
 		job.CommitRepo = ev.PullRequest.Base.Repo.FullName
 		job.CommitID = ev.PullRequest.Head.SHA
 	default:
@@ -140,7 +141,7 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 	}
 
 	repo := m.GetRepo(job.CommitRepo)
-	q := repo.GetQueue(queueName, job.Context)
+	q := repo.GetQueue(job.QueueName, job.Context)
 
 	// Try to find the most specific version of the script available in the following order
 	//  - Branch-specific scripts
@@ -225,9 +226,44 @@ func (m *Manager) GetJob(id string) (*Job, error) {
 		job.Status = StatusCancelled
 	}
 
+	// Populate repository/queue list
+	repo := m.GetRepo(job.CommitRepo)
+	q := repo.GetQueue(job.QueueName, job.Context)
+	q.AddJob(job)
+
 	// Save in memory for later
 	m.jobsMutex.Lock()
 	defer m.jobsMutex.Unlock()
 	m.jobs[id] = job
 	return job, nil
+}
+
+// LoadJobs adds all existing jobs found in the jobs-folder
+func (m *Manager) LoadJobs() error {
+	folder, err := os.Open(m.cfg.Jobs.Folder)
+	if err != nil {
+		return err
+	}
+	defer folder.Close()
+
+	contents, err := folder.Readdir(-1)
+	if err != nil {
+		return err
+	}
+
+	// Attempt to load jobs in the correct order
+	sort.Slice(contents, func(i, j int) bool {
+		return contents[i].ModTime().UnixNano() < contents[j].ModTime().UnixNano()
+	})
+
+	for k := range contents {
+		if contents[k].IsDir() {
+			// Recurse into directories
+			_, err := m.GetJob(contents[k].Name())
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

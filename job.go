@@ -40,6 +40,7 @@ func (s JobStatus) IsFinished() bool {
 // Job defines a single webhook event to be processed
 type Job struct {
 	ID         string          `json:"-"`
+	QueueName  string          `json:"queuename"`
 	Context    string          `json:"context"`
 	Script     string          `json:"script"`
 	Folder     string          `json:"-"`

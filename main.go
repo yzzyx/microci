@@ -80,6 +80,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Printf("Loading existing jobs...")
+	err = manager.LoadJobs()
+	if err != nil {
+		log.Printf("Could not load jobs: %v", err)
+		os.Exit(1)
+	}
+
 	view, err := NewViewHandler(&config, manager)
 	if err != nil {
 		log.Printf("Cannot initialize viewhandler: %+v", err)
