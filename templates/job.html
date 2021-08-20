@@ -4,7 +4,7 @@
 	<div>Status:</div>
 	<div>
         {{if eq .Job.Status 0}}<span class="pending">Pending</span>{{end}}
-        {{if eq .Job.Status 1}}<span class="executing">Executing</span> <a href="/cancel">cancel</a>{{end}}
+        {{if eq .Job.Status 1}}<span class="executing">Executing</span> <a href="{{.URL.Path}}/cancel">cancel</a>{{end}}
         {{if eq .Job.Status 2}}<span class="success">Success</span>{{end}}
         {{if eq .Job.Status 3}}<span class="error">Error</span>{{end}}
         {{if eq .Job.Status 4}}<span class="error">Cancelled</span>{{end}}
@@ -14,7 +14,6 @@
 		{{.Job.StatusDescription}}
 	</div>
 </div>
-
 
 <h4>Log</h4>
 <div class="log-contents">

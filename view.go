@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,7 +80,10 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	vars := struct {
 		Title string
 		Job   *Job
-	}{}
+		URL   *url.URL
+	}{
+		URL: r.URL,
+	}
 
 	job, err := v.manager.GetJob(id)
 	if err != nil {
