@@ -6,6 +6,7 @@ body, html {
 
 .wrap {
     padding: 8px;
+    min-height: calc(100vh - 16px);
 }
 
 #dark-toggle {
