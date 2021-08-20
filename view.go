@@ -134,6 +134,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 			return
 		}
 
+		s = strings.TrimRight(s, "\n\r")
 		if strings.HasPrefix(s, "[[microci-section]]") {
 			s = strings.TrimPrefix(s, "[[microci-section]]")
 
