@@ -4,6 +4,8 @@ import "time"
 
 // Config includes all configuration variables
 type Config struct {
+	ResourceDir string `fig:"resource_dir"`
+
 	Server struct {
 		Port    string `fig:"port" default:"80"`
 		Address string `fig:"address" default:"http://micro.ci:8080/"`

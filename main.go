@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -15,6 +16,9 @@ import (
 	gitea "github.com/yzzyx/gitea-webhook"
 )
 
+// DefaultResourceDir is used to locate resources such as preparation-scripts, templates and css files
+var DefaultResourceDir = "."
+
 func isFile(p string) bool {
 	st, err := os.Stat(p)
 	if err != nil {
@@ -22,7 +26,6 @@ func isFile(p string) bool {
 	}
 
 	return !st.IsDir()
-
 }
 
 func isDir(p string) bool {
@@ -74,6 +77,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if config.ResourceDir == "" {
+		config.ResourceDir = DefaultResourceDir
+	}
+
 	manager, err := NewManager(&config)
 	if err != nil {
 		log.Printf("Cannot initialize manager: %+v", err)
@@ -100,7 +107,7 @@ func main() {
 	router.Handle("/webhook/gitea", gitea.Handler(config.Gitea.SecretKey, manager.WebhookEvent))
 	router.Get("/job/{id}", ViewWrapper(view.GetJob))
 	router.Get("/job/{id}/cancel", ViewWrapper(view.CancelJob))
-	router.Mount("/css", http.StripPrefix("/css", http.FileServer(http.Dir("static/css"))))
+	router.Mount("/css", http.StripPrefix("/css", http.FileServer(http.Dir(filepath.Join(config.ResourceDir, "static", "css")))))
 
 	server := http.Server{
 		Handler: router,

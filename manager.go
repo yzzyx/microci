@@ -135,8 +135,9 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 		return
 	}
 
-	if !isDir(job.CommitRepo) {
-		log.Printf("ignoring repositoriy '%s' - is not a directory", ev.Repository.FullName)
+	repoPath := filepath.Join(m.cfg.Scripts.Folder, path.Clean(job.CommitRepo))
+	if !isDir(repoPath) {
+		log.Printf("ignoring repositoriy '%s' - is not a directory", repoPath)
 		return
 	}
 
@@ -147,12 +148,11 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 	//  - Branch-specific scripts
 	//  - Repository-wide scripts
 	//  - Global scripts (in main script folder)
-	repoPath := path.Clean(ev.Repository.FullName)
 	branchPath := path.Clean(branchName)
 	scriptName = path.Clean(scriptName)
 	scripts := []string{
-		filepath.Join(m.cfg.Scripts.Folder, repoPath, branchPath, scriptName),
-		filepath.Join(m.cfg.Scripts.Folder, repoPath, scriptName),
+		filepath.Join(repoPath, branchPath, scriptName),
+		filepath.Join(repoPath, scriptName),
 		filepath.Join(m.cfg.Scripts.Folder, scriptName),
 	}
 

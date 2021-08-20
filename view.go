@@ -28,7 +28,7 @@ type View struct {
 
 // NewViewHandler returns a new View-handler based on the supplied config and manager
 func NewViewHandler(cfg *Config, manager *Manager) (*View, error) {
-	templates, err := template.ParseGlob("templates/*")
+	templates, err := template.ParseGlob(filepath.Join(cfg.ResourceDir, "templates/*"))
 	if err != nil {
 		return nil, err
 	}

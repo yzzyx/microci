@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	gitea "github.com/yzzyx/gitea-webhook"
 )
@@ -61,11 +61,6 @@ func (w *Worker) ProcessJob(j *Job) {
 	}
 
 	j.SetStatus(StatusExecuting, "In progress...")
-	currentDir, err := os.Getwd()
-	if err != nil {
-		handleError(err)
-		return
-	}
 
 	// Run preparation scripts
 	prepareScript := "prepare-pr.sh"
@@ -73,16 +68,29 @@ func (w *Worker) ProcessJob(j *Job) {
 		prepareScript = "prepare-push.sh"
 	}
 
+	script, err := filepath.Abs(filepath.Join(j.config.ResourceDir, "scripts", prepareScript))
+	if err != nil {
+		handleError(err)
+		return
+	}
+
 	fmt.Fprintf(j.logFile, "[[microci-section]]Prepare git branch\n")
-	err = j.ExecScript(filepath.Join(currentDir, "scripts", prepareScript))
+	err = j.ExecScript(script)
 	if err != nil {
 		handleError(err)
 		return
 	}
 
 	// Run actual text-script
-	fmt.Fprintf(j.logFile, "[[microci-section]]Run %s\n", j.Script)
-	err = j.ExecScript(filepath.Join(currentDir, j.Script))
+	trimmedPath := strings.TrimPrefix(strings.TrimPrefix(j.Script, j.config.Scripts.Folder), "/")
+	fmt.Fprintf(j.logFile, "[[microci-section]]Run %s\n", trimmedPath)
+	script, err = filepath.Abs(j.Script)
+	if err != nil {
+		handleError(err)
+		return
+	}
+
+	err = j.ExecScript(script)
 	if err != nil {
 		handleError(err)
 		return
