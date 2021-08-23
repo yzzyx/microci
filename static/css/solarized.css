@@ -11,7 +11,8 @@
     color: #073642;
 }
 
-.log-contents .num {
+.log-contents .num,
+.navbar {
     background-color: #eee8d5;
     color: #839496;
 }
@@ -28,7 +29,8 @@
     color: #839496;
 }
 
-#dark-toggle:checked + .wrap .log-contents .num {
+#dark-toggle:checked + .wrap .log-contents .num,
+#dark-toggle:checked + .wrap .navbar {
     background-color: #073642;
     color: #657b83;
 }
