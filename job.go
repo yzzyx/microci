@@ -14,6 +14,7 @@ import (
 	"time"
 
 	gitea "github.com/yzzyx/gitea-webhook"
+	"github.com/yzzyx/microci/config"
 )
 
 // JobStatus contains information about the current state of a job
@@ -55,7 +56,7 @@ type Job struct {
 	ctx       context.Context
 	ctxCancel func()
 	logFile   *os.File
-	config    *Config
+	config    *config.Config
 
 	Status            JobStatus `json:"status"`
 	StatusDescription string    `json:"status_description"`

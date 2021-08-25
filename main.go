@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/kkyr/fig"
 	gitea "github.com/yzzyx/gitea-webhook"
+	"github.com/yzzyx/microci/config"
 )
 
 // DefaultResourceDir is used to locate resources such as preparation-scripts, templates and css files
@@ -56,7 +57,7 @@ func main() {
 		}
 	}()
 
-	config := Config{}
+	config := config.Config{}
 	err := fig.Load(&config,
 		fig.File("config.yaml"),
 		fig.UseEnv("MICROCI"),

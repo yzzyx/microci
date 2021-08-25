@@ -14,12 +14,13 @@ import (
 	"sync"
 
 	gitea "github.com/yzzyx/gitea-webhook"
+	"github.com/yzzyx/microci/config"
 )
 
 // Manager keeps track of all CI workers
 type Manager struct {
 	api *gitea.API
-	cfg *Config
+	cfg *config.Config
 	url *url.URL // URL of microci server
 
 	workerCh chan *Job
@@ -30,7 +31,7 @@ type Manager struct {
 	jobsMutex  *sync.RWMutex
 }
 
-func NewManager(cfg *Config) (*Manager, error) {
+func NewManager(cfg *config.Config) (*Manager, error) {
 	u, err := url.Parse(cfg.Server.Address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse URL in setting 'server.address': %w", err)

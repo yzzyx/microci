@@ -15,19 +15,20 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/yzzyx/microci/ansi"
+	"github.com/yzzyx/microci/config"
 )
 
 var errNotFound = errors.New("not found")
 
 // View is the base structure for views
 type View struct {
-	cfg       *Config
+	cfg       *config.Config
 	templates *template.Template
 	manager   *Manager
 }
 
 // NewViewHandler returns a new View-handler based on the supplied config and manager
-func NewViewHandler(cfg *Config, manager *Manager) (*View, error) {
+func NewViewHandler(cfg *config.Config, manager *Manager) (*View, error) {
 	templates, err := template.ParseGlob(filepath.Join(cfg.ResourceDir, "templates/*"))
 	if err != nil {
 		return nil, err
