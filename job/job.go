@@ -1,4 +1,4 @@
-package main
+package job
 
 import (
 	"context"
@@ -56,7 +56,7 @@ type Job struct {
 	ctx       context.Context
 	ctxCancel func()
 	logFile   *os.File
-	config    *config.Config
+	Config    *config.Config
 
 	Status            JobStatus `json:"status"`
 	StatusDescription string    `json:"status_description"`
@@ -97,7 +97,7 @@ func (j *Job) Setup() error {
 	}
 
 	j.TargetURL = strings.TrimSuffix(j.TargetURL, "/") + path.Join("/job", j.ID)
-	j.Folder = filepath.Join(j.config.Jobs.Folder, j.ID)
+	j.Folder = filepath.Join(j.Config.Jobs.Folder, j.ID)
 	gitFolder := filepath.Join(j.Folder, "git")
 	err = os.MkdirAll(gitFolder, 0755)
 	if err != nil {
@@ -181,4 +181,18 @@ func (j *Job) Save() error {
 		return err
 	}
 	return nil
+}
+
+// Cancel cancels an executing of pending job
+func (j *Job) Cancel() {
+	j.mx.Lock()
+	defer j.mx.Unlock()
+
+	if (j.Status == StatusExecuting || j.Status == StatusPending) && j.ctxCancel != nil {
+		j.ctxCancel()
+		j.ctxCancel = nil
+		j.Status = StatusCancelled
+		j.StatusDescription = "cancelled"
+		go j.PushStatus()
+	}
 }

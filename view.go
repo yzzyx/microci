@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/yzzyx/microci/ansi"
 	"github.com/yzzyx/microci/config"
+	"github.com/yzzyx/microci/job"
 )
 
 var errNotFound = errors.New("not found")
@@ -66,10 +67,7 @@ func (v *View) CancelJob(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if job.ctxCancel != nil {
-		job.ctxCancel()
-	}
-
+	job.Cancel()
 	http.Redirect(w, r, "/job/"+id, http.StatusFound)
 	return nil
 }
@@ -80,19 +78,19 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 
 	vars := struct {
 		Title string
-		Job   *Job
+		Job   *job.Job
 		URL   *url.URL
 	}{
 		URL: r.URL,
 	}
 
-	job, err := v.manager.GetJob(id)
+	j, err := v.manager.GetJob(id)
 	if err != nil {
 		return err
 	}
 
-	vars.Title = fmt.Sprintf("job %s", id)
-	vars.Job = job
+	vars.Title = fmt.Sprintf("j %s", id)
+	vars.Job = j
 
 	err = v.templates.ExecuteTemplate(w, "job.html", vars)
 	if err != nil {
@@ -111,11 +109,11 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	if job.Status == StatusPending {
+	if j.Status == job.StatusPending {
 		return nil
 	}
 
-	f, err := os.Open(filepath.Join(job.Folder, "logs"))
+	f, err := os.Open(filepath.Join(j.Folder, "logs"))
 	if err != nil {
 		return err
 	}
@@ -179,7 +177,7 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	scanLine()
 
 	// If process is still running, keep reading from output file
-	for !job.Status.IsFinished() {
+	for !j.Status.IsFinished() {
 		flush()
 		select {
 		case <-r.Context().Done():

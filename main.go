@@ -127,11 +127,15 @@ func main() {
 	<-ctx.Done()
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	manager.Shutdown()
 
 	err = server.Shutdown(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "Error shutting down server:", err)
 	}
+
+	// FIXME - this is here to give jobs a fair chance of pushing "cancelled"-updates to the server,
+	// but it would be better if we could keep track of them instead
+	fmt.Fprintf(os.Stderr, "Allowing updates to propagate\n")
+	time.Sleep(5)
 }

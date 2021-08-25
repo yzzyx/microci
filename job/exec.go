@@ -1,4 +1,4 @@
-package main
+package job
 
 import (
 	"bufio"
@@ -64,7 +64,7 @@ func exportVar(prefix string, i interface{}) []string {
 // ExecScript executes a specific script, with all information in the struct passed as 'i' exported
 // as environment variables
 func (j *Job) ExecScript(script string) error {
-	duration := j.config.Jobs.MaxExecutionTime
+	duration := j.Config.Jobs.MaxExecutionTime
 	timeoutCtx, timeoutCancel := context.WithTimeout(j.ctx, duration)
 	defer timeoutCancel()
 

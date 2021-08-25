@@ -1,6 +1,10 @@
 package main
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/yzzyx/microci/job"
+)
 
 // Queue describes a job queue belonging to a project
 // It is uniquely identified by name, which can be
@@ -9,7 +13,7 @@ import "sync"
 type Queue struct {
 	Name    string
 	Context string
-	jobs    []*Job
+	jobs    []*job.Job
 
 	mx *sync.RWMutex
 }
@@ -23,14 +27,14 @@ type Repository struct {
 }
 
 // AddJob adds a new job to the top of the job list
-func (q *Queue) AddJob(job *Job) {
+func (q *Queue) AddJob(j *job.Job) {
 	q.mx.Lock()
 	defer q.mx.Unlock()
-	q.jobs = append([]*Job{job}, q.jobs...)
+	q.jobs = append([]*job.Job{j}, q.jobs...)
 }
 
 // GetJob returns a specific job
-func (q *Queue) GetJob(id string) *Job {
+func (q *Queue) GetJob(id string) *job.Job {
 	q.mx.RLock()
 	defer q.mx.RUnlock()
 
@@ -44,7 +48,7 @@ func (q *Queue) GetJob(id string) *Job {
 }
 
 // GetLastJob returns the last available job in the queue
-func (q *Queue) GetLastJob() *Job {
+func (q *Queue) GetLastJob() *job.Job {
 	q.mx.RLock()
 	defer q.mx.RUnlock()
 

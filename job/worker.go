@@ -1,4 +1,4 @@
-package main
+package job
 
 import (
 	"errors"
@@ -68,7 +68,7 @@ func (w *Worker) ProcessJob(j *Job) {
 		prepareScript = "prepare-push.sh"
 	}
 
-	script, err := filepath.Abs(filepath.Join(j.config.ResourceDir, "scripts", prepareScript))
+	script, err := filepath.Abs(filepath.Join(j.Config.ResourceDir, "scripts", prepareScript))
 	if err != nil {
 		handleError(err)
 		return
@@ -82,7 +82,7 @@ func (w *Worker) ProcessJob(j *Job) {
 	}
 
 	// Run actual text-script
-	trimmedPath := strings.TrimPrefix(strings.TrimPrefix(j.Script, j.config.Scripts.Folder), "/")
+	trimmedPath := strings.TrimPrefix(strings.TrimPrefix(j.Script, j.Config.Scripts.Folder), "/")
 	fmt.Fprintf(j.logFile, "[[microci-section]]Run %s\n", trimmedPath)
 	script, err = filepath.Abs(j.Script)
 	if err != nil {

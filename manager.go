@@ -15,6 +15,7 @@ import (
 
 	gitea "github.com/yzzyx/gitea-webhook"
 	"github.com/yzzyx/microci/config"
+	"github.com/yzzyx/microci/job"
 )
 
 // Manager keeps track of all CI workers
@@ -23,11 +24,11 @@ type Manager struct {
 	cfg *config.Config
 	url *url.URL // URL of microci server
 
-	workerCh chan *Job
+	workerCh chan *job.Job
 
 	repos      []*Repository
 	reposMutex *sync.Mutex
-	jobs       map[string]*Job
+	jobs       map[string]*job.Job
 	jobsMutex  *sync.RWMutex
 }
 
@@ -39,7 +40,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 
 	m := &Manager{
 		jobsMutex:  &sync.RWMutex{},
-		jobs:       map[string]*Job{},
+		jobs:       map[string]*job.Job{},
 		reposMutex: &sync.Mutex{},
 		cfg:        cfg,
 		url:        u,
@@ -51,7 +52,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		},
 	}
 
-	m.workerCh = make(chan *Job)
+	m.workerCh = make(chan *job.Job)
 
 	if cfg.Jobs.Workers <= 0 {
 		return nil, fmt.Errorf("invalid number of workers (%d), must be atleast one", cfg.Jobs.Workers)
@@ -59,7 +60,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 
 	// Start workers
 	for i := 0; i < cfg.Jobs.Workers; i++ {
-		go NewWorker(m.workerCh)
+		go job.NewWorker(m.workerCh)
 	}
 
 	return m, nil
@@ -73,9 +74,7 @@ func (m *Manager) Shutdown() {
 
 	// Cancel active jobs
 	for _, j := range m.jobs {
-		if j.ctxCancel != nil {
-			j.ctxCancel()
-		}
+		j.Cancel()
 	}
 }
 
@@ -99,11 +98,11 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 	var scriptName string
 	var branchName string
 
-	job := &Job{
+	job := &job.Job{
 		Type:      typ,
 		Event:     ev,
 		API:       m.api,
-		config:    m.cfg,
+		Config:    m.cfg,
 		Context:   m.cfg.Jobs.DefaultContext,
 		TargetURL: m.url.String(),
 	}
@@ -176,8 +175,8 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 		m.jobsMutex.Unlock()
 
 		// Cancel previous run of this particular job, if we have one (and setting is active)
-		if lastJob := q.GetLastJob(); lastJob != nil && lastJob.ctxCancel != nil && m.cfg.Jobs.CancelPrevious {
-			lastJob.ctxCancel()
+		if lastJob := q.GetLastJob(); lastJob != nil && m.cfg.Jobs.CancelPrevious {
+			lastJob.Cancel()
 		}
 		q.AddJob(job)
 
@@ -188,18 +187,18 @@ func (m *Manager) WebhookEvent(typ gitea.EventType, ev gitea.Event, responseWrit
 }
 
 // GetJob returns a Job structure, either from memory if it exists, or recreated from disk
-func (m *Manager) GetJob(id string) (*Job, error) {
+func (m *Manager) GetJob(id string) (*job.Job, error) {
 	// First, check if we have it in memory
-	job := func() *Job {
+	j := func() *job.Job {
 		m.jobsMutex.RLock()
 		defer m.jobsMutex.RUnlock()
 		return m.jobs[id]
 	}()
-	if job != nil {
-		return job, nil
+	if j != nil {
+		return j, nil
 	}
 
-	// Otherwise, recreate job from disk
+	// Otherwise, recreate j from disk
 	jobPath := filepath.Join(m.cfg.Jobs.Folder, id)
 	st, err := os.Stat(jobPath)
 	if err != nil {
@@ -215,31 +214,31 @@ func (m *Manager) GetJob(id string) (*Job, error) {
 		return nil, err
 	}
 
-	job = &Job{}
-	err = json.NewDecoder(f).Decode(&job)
+	j = &job.Job{}
+	err = json.NewDecoder(f).Decode(&j)
 	if err != nil {
 		return nil, err
 	}
 
-	job.ID = id
-	job.Folder = jobPath
+	j.ID = id
+	j.Folder = jobPath
 
-	// If job is still in status pending, it means that the
+	// If j is still in status pending, it means that the
 	// server was killed before it finished, so we'll consider it cancelled
-	if job.Status == StatusPending {
-		job.Status = StatusCancelled
+	if j.Status == job.StatusPending {
+		j.Status = job.StatusCancelled
 	}
 
 	// Populate repository/queue list
-	repo := m.GetRepo(job.CommitRepo)
-	q := repo.GetQueue(job.QueueName, job.Context)
-	q.AddJob(job)
+	repo := m.GetRepo(j.CommitRepo)
+	q := repo.GetQueue(j.QueueName, j.Context)
+	q.AddJob(j)
 
 	// Save in memory for later
 	m.jobsMutex.Lock()
 	defer m.jobsMutex.Unlock()
-	m.jobs[id] = job
-	return job, nil
+	m.jobs[id] = j
+	return j, nil
 }
 
 // LoadJobs adds all existing jobs found in the jobs-folder
@@ -265,7 +264,7 @@ func (m *Manager) LoadJobs() error {
 			// Recurse into directories
 			_, err := m.GetJob(contents[k].Name())
 			if err != nil {
-				return err
+				log.Printf("Could not load job %s: %v", contents[k].Name(), err)
 			}
 		}
 	}
