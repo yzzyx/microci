@@ -52,7 +52,7 @@ a, a:visited  {
 .c5 {color: #d33682;}
 .c6 {color: #2aa198;}
 .c7 {color: #073642;}
-.c8 {color: #fdf6e3;}
+/* .c8 {color: #fdf6e3;} -- used for background, use ansi.css */
 .c9 {color: #cb4b16;}
 .c10 {color: #93a1a1;}
 .c11 {color: #839496;}
