@@ -104,6 +104,12 @@ func (j *Job) Setup() error {
 		return err
 	}
 
+	artifactFolder := filepath.Join(j.Folder, "artifacts")
+	err = os.MkdirAll(artifactFolder, 0755)
+	if err != nil {
+		return err
+	}
+
 	// Create and open log-file now, so that we can use it for other scripts later
 	j.logFile, err = os.Create(filepath.Join(j.Folder, "logs"))
 	if err != nil {

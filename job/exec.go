@@ -73,6 +73,7 @@ func (j *Job) ExecScript(script string) error {
 	cmd.Dir = filepath.Join(j.Folder, "git")
 
 	shellVariables := exportVar("", j.Event)
+	shellVariables = append(shellVariables, "ARTIFACT_DIR="+filepath.Join(j.Folder, "artifacts"))
 	cmd.Env = append(os.Environ(), shellVariables...)
 
 	stdout, err := cmd.StdoutPipe()
