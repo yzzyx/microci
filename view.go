@@ -84,6 +84,11 @@ func (v *View) GetArtifact(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	name, err = url.PathUnescape(name)
+	if err != nil {
+		return err
+	}
+
 	f, err := os.Open(filepath.Join(job.Folder, "artifacts", name))
 	if err != nil {
 		return err
