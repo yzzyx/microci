@@ -13,6 +13,17 @@
 	<div>
 		{{.Job.StatusDescription}}
 	</div>
+    {{if len .Artifacts}}
+    <div>Artifacts:</div>
+        {{$id := .Job.ID}}
+        <ul>
+            {{range $i, $f := .Artifacts}}
+                {{if not $f.IsDir}}
+                    <li><a href="/job/{{$id}}/artifacts/{{$f.Name}}">{{$f.Name}}</a></li>
+                {{end}}
+            {{end}}
+        </ul>
+    {{end}}
 </div>
 
 <h4>Log</h4>

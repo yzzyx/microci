@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -72,14 +74,42 @@ func (v *View) CancelJob(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// GetArtifact returns a specific artifact from a job
+func (v *View) GetArtifact(w http.ResponseWriter, r *http.Request) error {
+	id := chi.URLParam(r, "id")
+	name := chi.URLParam(r, "name")
+
+	job, err := v.manager.GetJob(id)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(filepath.Join(job.Folder, "artifacts", name))
+	if err != nil {
+		return err
+	}
+
+	mimetype := mime.TypeByExtension(name)
+	if mimetype != "" {
+		w.Header().Add("Content-type", mimetype)
+	}
+
+	_, err = io.Copy(w, f)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetJob handles all requests to "/job/{id}"
 func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 
 	vars := struct {
-		Title string
-		Job   *job.Job
-		URL   *url.URL
+		Title     string
+		Job       *job.Job
+		URL       *url.URL
+		Artifacts []os.FileInfo
 	}{
 		URL: r.URL,
 	}
@@ -91,6 +121,15 @@ func (v *View) GetJob(w http.ResponseWriter, r *http.Request) error {
 
 	vars.Title = fmt.Sprintf("j %s", id)
 	vars.Job = j
+
+	artifactFolder, err := os.Open(filepath.Join(j.Folder, "artifacts"))
+	if err == nil {
+		defer artifactFolder.Close()
+		vars.Artifacts, err = artifactFolder.Readdir(-1)
+		if err != nil {
+			return err
+		}
+	}
 
 	err = v.templates.ExecuteTemplate(w, "job.html", vars)
 	if err != nil {
