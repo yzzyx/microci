@@ -54,6 +54,12 @@ body, html {
     transition: max-height .25s ease-in-out;
 }
 
+#auto-scroll-toggle {
+    position: fixed;
+    right: 15px;
+    bottom: 15px;
+    opacity: 30%;
+}
 
 /* Header */
 .navbar {
